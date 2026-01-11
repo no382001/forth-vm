@@ -11,7 +11,7 @@ test(simple_words) :-
 
 test(words_with_numbers) :-
     tokenize("lit 100 dup", Result),
-    assertion(Result == ok([lit, '100', dup])).
+    assertion(Result == ok([lit, 100, dup])).
 
 test(arithmetic_operators) :-
     tokenize("+ - * /", Result),
@@ -27,15 +27,15 @@ test(memory_operations) :-
 
 test(handles_newlines) :-
     tokenize("lit\n100\ndup", Result),
-    assertion(Result == ok([lit, '100', dup])).
+    assertion(Result == ok([lit, 100, dup])).
 
 test(handles_tabs) :-
     tokenize("lit\t100\tdup", Result),
-    assertion(Result == ok([lit, '100', dup])).
+    assertion(Result == ok([lit, 100, dup])).
 
 test(handles_mixed_whitespace) :-
     tokenize("lit  \n  100\t\ndup", Result),
-    assertion(Result == ok([lit, '100', dup])).
+    assertion(Result == ok([lit, 100, dup])).
 
 test(handles_leading_whitespace) :-
     tokenize("   lit dup", Result),
@@ -47,7 +47,7 @@ test(handles_trailing_whitespace) :-
 
 test(ignores_comments) :-
     tokenize("lit \\ this is a comment\n100", Result),
-    assertion(Result == ok([lit, '100'])).
+    assertion(Result == ok([lit, 100])).
 
 test(handles_comment_at_end_of_line) :-
     tokenize("dup drop \\ cleanup", Result),
@@ -55,19 +55,19 @@ test(handles_comment_at_end_of_line) :-
 
 test(handles_multiple_comments) :-
     tokenize("lit \\ push\n100 \\ value\ndup \\ duplicate", Result),
-    assertion(Result == ok([lit, '100', dup])).
+    assertion(Result == ok([lit, 100, dup])).
 
 test(forth_program) :-
     tokenize("lit 100\ndup\n+\n", Result),
-    assertion(Result == ok([lit, '100', dup, +])).
+    assertion(Result == ok([lit, 100, dup, +])).
 
 test(branching_program) :-
     tokenize("dup\n0branch\n10\ncall\nret", Result),
-    assertion(Result == ok([dup, '0branch', '10', call, ret])).
+    assertion(Result == ok([dup, '0branch', 10, call, ret])).
 
 test(memory_operations_program) :-
     tokenize("lit 1000\n@\nlit 42\n!", Result),
-    assertion(Result == ok([lit, '1000', @, lit, '42', !])).
+    assertion(Result == ok([lit, 1000, @, lit, 42, !])).
 
 test(empty_input) :-
     tokenize("", Result),
@@ -79,7 +79,7 @@ test(whitespace_only_input) :-
 
 test(negative_numbers) :-
     tokenize("lit -42 +", Result),
-    assertion(Result == ok([lit, '-42', +])).
+    assertion(Result == ok([lit, -42, +])).
 
 test(underscores_in_identifiers) :-
     tokenize("my_var test_fn", Result),
@@ -87,7 +87,7 @@ test(underscores_in_identifiers) :-
 
 test(zero_byte) :-
     tokenize("nop lit 0 drop", Result),
-    assertion(Result == ok([nop, lit, '0', drop])).
+    assertion(Result == ok([nop, lit, 0, drop])).
 
 test(trap_instruction) :-
     tokenize("trap halt", Result),
