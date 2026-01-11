@@ -1,0 +1,14 @@
+_build/
+gen/
+
+vm
+codegen
+
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+
+.DS_Store
+Thumbs.db
