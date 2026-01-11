@@ -6,17 +6,23 @@
 #include <cstdio>
 #include <string_view>
 
-using cell_t = int32_t;
-using ucell_t = uint32_t;
+using cell_t = int8_t;
+using ucell_t = std::make_unsigned_t<cell_t>;
+
 constexpr size_t CELL_SIZE = sizeof(cell_t);
 constexpr size_t MEMORY_SIZE = 65536;
 constexpr size_t STACK_SIZE = 256;
 
-constexpr ucell_t DS_START = MEMORY_SIZE - (STACK_SIZE * CELL_SIZE * 2);
-constexpr ucell_t RS_START = DS_START + (STACK_SIZE * CELL_SIZE);
-constexpr ucell_t SP_ADDR = DS_START - CELL_SIZE * 3;
-constexpr ucell_t RP_ADDR = DS_START - CELL_SIZE * 2;
-constexpr ucell_t IP_ADDR = DS_START - CELL_SIZE * 1;
+using addr_t = std::conditional_t<(MEMORY_SIZE <= 0xFF), uint8_t,
+              std::conditional_t<(MEMORY_SIZE <= 0xFFFF), uint16_t,
+              std::conditional_t<(MEMORY_SIZE <= 0xFFFFFFFF), uint32_t,
+              uint64_t>>>;
+
+constexpr addr_t DS_START = MEMORY_SIZE - (STACK_SIZE * CELL_SIZE * 2);
+constexpr addr_t RS_START = DS_START + (STACK_SIZE * CELL_SIZE);
+constexpr addr_t SP_ADDR = DS_START - CELL_SIZE * 3;
+constexpr addr_t RP_ADDR = DS_START - CELL_SIZE * 2;
+constexpr addr_t IP_ADDR = DS_START - CELL_SIZE * 1;
 
 enum trap : uint8_t {
   TRAP_EMIT = 0, // ( char -- )
