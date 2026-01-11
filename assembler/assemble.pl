@@ -25,7 +25,16 @@ skip_to_newline --> [10], !.  % 10 is '\n'
 skip_to_newline --> [_], skip_to_newline.
 skip_to_newline --> [].       % EOF
 
-word(W) --> word_chars(Chars), { Chars \= [], atom_codes(W, Chars) }.
+word(W) --> 
+    word_chars(Chars), 
+    { Chars \= [], 
+      (catch(atom_codes(A, Chars), _, fail),
+       atom_number(A, Num) ->
+        W = Num
+      ;
+        atom_codes(W, Chars)
+      )
+    }.
 
 word_chars([C|Cs]) --> 
     [C], 

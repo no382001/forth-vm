@@ -52,4 +52,4 @@ format-check:
 	clang-format --dry-run --Werror $(wildcard src/*.cpp) $(HDRS)
 
 .PHONY test:
-	swipl -t run_tests assembler/tests/assemble.plt
+	swipl -g "['assembler/tests/assemble.plt'], ['assembler/tests/macro.plt'], run_tests." -t halt
