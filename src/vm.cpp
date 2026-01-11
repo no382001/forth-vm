@@ -175,11 +175,38 @@ const std::array<op_info, OP_COUNT> dispatch = {{
 }};
 
 auto step(vm &v) -> void {
-  auto opcode = v.mem[v.ip()++];
-  assert(opcode < OP_COUNT && "invalid opcode");
+  if (v.ip() >= MEMORY_SIZE) {
+    std::fprintf(stderr, "error: ip out of bounds (ip=%u, max=%zu)\n", 
+                 v.ip(), MEMORY_SIZE - 1);
+    v.running = false;
+    return;
+  }
+
+  auto prev_ip = v.ip();
+  auto opcode = static_cast<uint8_t>(fetch_cell(v));
+
+  if (opcode >= OP_COUNT) {
+    std::fprintf(stderr, "error: invalid opcode %d at ip=%u\n", opcode, prev_ip);
+    v.running = false;
+    return;
+  }
+
   const auto &info = dispatch[opcode];
-  assert(v.sp() >= info.in && "stack underflow");
-  assert(v.rp() >= info.rin && "return stack underflow");
+
+  if (v.sp() < info.in) {
+    std::fprintf(stderr, "error: stack underflow at ip=%u (%s needs %d, sp=%u)\n",
+                 prev_ip, info.name.data(), info.in, v.sp());
+    v.running = false;
+    return;
+  }
+
+  if (v.rp() < info.rin) {
+    std::fprintf(stderr, "error: return stack underflow at ip=%u (%s needs %d, rp=%u)\n",
+                 prev_ip, info.name.data(), info.rin, v.rp());
+    v.running = false;
+    return;
+  }
+
   info.fn(v);
 }
 
