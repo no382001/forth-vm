@@ -45,11 +45,6 @@ expand_macros([macro_call(subst, [N])|T], Defs, [V|Out]) :-
     member(N-V, Defs),
     expand_macros(T, Defs, Out).
 
-% expand_macros([macro_call(Name, Args)|T], Defs, Out) :-
-%     macro(Name, Args, Expansion), !,
-%     append(Expansion, T, NewTerms),
-%     expand_macros(NewTerms, Defs, Out).
-
 expand_macros([X|T], Defs, [X|Out]) :-
     expand_macros(T, Defs, Out).
 
