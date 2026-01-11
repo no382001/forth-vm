@@ -1,0 +1,4 @@
+add string(varname,"hello world") nullterm'd
+add addrofstr(varname) that works just like labels but pops the address
+
+-> this is all leading up to implementing the dictionary

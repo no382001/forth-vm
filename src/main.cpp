@@ -33,6 +33,11 @@ auto load_from_stdin(vm& v, uint16_t addr = 0) -> size_t {
   };
   
   std::copy(bytes.begin(), bytes.end(), v.mem.begin() + addr);
+  
+  if (!freopen("/dev/tty", "r", stdin)) { // re-tie pipe so we can do getchar etc.
+    std::cerr << "warning: could not reopen stdin from /dev/tty\n";
+  }
+
   return bytes.size();
 }
 

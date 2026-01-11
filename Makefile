@@ -55,4 +55,5 @@ format-check:
 
 .PHONY: test
 test:
-	swipl -g "['assembler/tests/assemble.plt'], ['assembler/tests/macro.plt'], run_tests." -t halt
+	swipl -g "['assembler/tests/assemble.plt'], ['assembler/tests/macro.plt'], run_tests." -t halt && \
+	./tests/integ.sh
