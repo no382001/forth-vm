@@ -19,7 +19,7 @@ CODEGEN_SRCS := src/codegen.cpp $(filter-out src/main.cpp, $(SRCS))
 CODEGEN_OBJS := $(BUILD_DIR)/codegen.o $(filter-out $(BUILD_DIR)/main.o, $(OBJS))
 
 .PHONY: all
-all: $(TARGET) $(GEN_DIR)/ops.pl
+all: $(TARGET) $(GEN_DIR)/gen.pl
 
 $(TARGET): $(OBJS)
 	$(CXX) $(OBJS) -o $@
@@ -27,7 +27,7 @@ $(TARGET): $(OBJS)
 $(CODEGEN): $(CODEGEN_OBJS)
 	$(CXX) $(CODEGEN_OBJS) -o $@
 
-$(GEN_DIR)/ops.pl: $(CODEGEN) | $(GEN_DIR)
+$(GEN_DIR)/gen.pl: $(CODEGEN) | $(GEN_DIR)
 	./$(CODEGEN) > $@
 
 $(BUILD_DIR)/%.o: src/%.cpp $(HDRS) | $(BUILD_DIR)
@@ -50,3 +50,6 @@ format:
 .PHONY: format-check
 format-check:
 	clang-format --dry-run --Werror $(wildcard src/*.cpp) $(HDRS)
+
+.PHONY test:
+	swipl -t run_tests assembler/tests/assemble.plt

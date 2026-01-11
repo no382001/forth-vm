@@ -21,8 +21,9 @@ auto escape_prolog(std::string_view s) -> std::string {
 
 auto main() -> int {
   std::cout << "% auto-generated from dispatch table\n";
+  std::cout << ":- module(gen, [op/6, cell_size/1]).\n\n";
   std::cout
-      << "% op(Name, Opcode, StackIn, StackOut, RStackIn, RStackOut).\n\n";
+      << "% op(Name, Opcode, StackIn, StackOut, RStackIn, RStackOut).\n";
 
   for (const auto &info : dispatch) {
     std::cout << "op('" << escape_prolog(info.name) << "', "
@@ -32,7 +33,12 @@ auto main() -> int {
               << static_cast<int>(info.rout) << ").\n";
   }
 
-  std::cout << "op(X, X, 0, 0, 0, 0).\n";
+  std::cout << "op(X, X, 0, 0, 0, 0).\n\n";
+
+  std::cout
+      << "% cell_size(Size).\n";
+  std::cout
+      << "cell_size(" << CELL_SIZE << ").\n";
 
   return 0;
 }
