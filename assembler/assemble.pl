@@ -36,13 +36,23 @@ word(W) -->
       )
     }.
 
+word_chars([34|Cs]) --> [34], !, quoted_then_rest(Cs).  % 34 is "
 word_chars([C|Cs]) --> 
     [C], 
     { \+ char_type(C, space), 
       \+ char_type(C, white),
-      C \= 92 },  % 92 is '\'
+      C \= 92 },
     word_chars(Cs).
 word_chars([]) --> [].
+
+quoted_then_rest(Cs) -->
+    quoted_content(QCs),
+    [34],
+    word_chars(Rest),
+    { append(QCs, [34|Rest], Cs) }.
+
+quoted_content([C|Cs]) --> [C], { C \= 34 }, !, quoted_content(Cs).
+quoted_content([]) --> [].
 
 context(Ctx) -->
     rest(Codes),

@@ -6,10 +6,27 @@ resolve(Source, Result) :-
     assemble:tokenize(Source, ok(Tokens)),
     phrase(parse_terms(Terms), Tokens),
     expand_macros(Terms, [], Expanded),
-    collect_labels(Expanded, 0, Labels),
-    maplist(resolve_ref(Labels), Expanded, Nested), !,
-    append(Nested, Resolved),
+    
+    % separate strings from code
+    partition(is_string_def, Expanded, StringDefs, Code),
+    
+    % collect labels from code
+    collect_labels(Code, 0, Labels),
+    
+    % figure out where strings go (after code)
+    code_size(Code, CodeSize),
+    collect_strings(StringDefs, CodeSize, StringMap, StringBytes),
+    
+    % resolve all references
+    append(Labels, StringMap, AllRefs),
+    maplist(resolve_ref(AllRefs), Code, NestedCode), !,
+    append(NestedCode, ResolvedCode),
+    
+    % append string data as raw bytes
+    append(ResolvedCode, StringBytes, Resolved),
     Result = ok(Resolved).
+
+is_string_def(string_def(_, _)).
 
 % ============================================================
 % parsing
@@ -17,6 +34,14 @@ resolve(Source, Result) :-
 
 parse_terms([T|Ts]) --> parse_term(T), !, parse_terms(Ts).
 parse_terms([]) --> [].
+
+% string(name,"content")
+parse_term(string_def(Name, Bytes)) -->
+    [Tok],
+    { atom_string(Tok, S),
+      sub_string(S, 0, 7, _, "string("),
+      parse_string_macro(S, Name, Bytes)
+    }, !.
 
 parse_term(macro_call(Name, Args)) -->
     [Tok],
@@ -28,9 +53,19 @@ parse_term(macro_call(Name, Args)) -->
 
 parse_term(Tok) --> [Tok].
 
-% sonvert "5" -> 5, "foo" -> foo
 parse_arg(Str, Num) :- number_string(Num, Str), !.
 parse_arg(Str, Atom) :- atom_string(Atom, Str).
+
+% parse string(name,"content") -> Name, Bytes (null-terminated)
+parse_string_macro(S, Name, Bytes) :-
+    sub_string(S, 7, _, 1, Inside),  % strip "string(" and ")"
+    sub_string(Inside, Before, 1, _, ","),
+    sub_string(Inside, 0, Before, _, NameStr),
+    atom_string(Name, NameStr),
+    Start is Before + 2,  % skip comma and opening quote
+    sub_string(Inside, Start, _, 1, Content),  % strip closing quote
+    string_codes(Content, ContentCodes),
+    append(ContentCodes, [0], Bytes).  % null terminate
 
 % ============================================================
 % expand macros
@@ -61,16 +96,48 @@ collect_labels([macro_call(branch, _)|T], PC, Labels) :-
 collect_labels([macro_call(zbranch, _)|T], PC, Labels) :-
     PC1 is PC + 1,
     collect_labels(T, PC1, Labels).
+collect_labels([macro_call(call, _)|T], PC, Labels) :-
+    PC1 is PC + 1,
+    collect_labels(T, PC1, Labels).
+collect_labels([macro_call(addrofstr, _)|T], PC, Labels) :-
+    PC1 is PC + 2,  % becomes: lit <addr>
+    collect_labels(T, PC1, Labels).
 collect_labels([X|T], PC, Labels) :-
     X \= macro_call(_, _),
     PC1 is PC + 1,
     collect_labels(T, PC1, Labels).
 
 % ============================================================
+% code size
+% ============================================================
+
+code_size([], 0).
+code_size([macro_call(label, _)|T], N) :- code_size(T, N).
+code_size([macro_call(branch, _)|T], N) :- code_size(T, N1), N is N1 + 2.
+code_size([macro_call(zbranch, _)|T], N) :- code_size(T, N1), N is N1 + 2.
+code_size([macro_call(call, _)|T], N) :- code_size(T, N1), N is N1 + 2.
+code_size([macro_call(addrofstr, _)|T], N) :- code_size(T, N1), N is N1 + 2.
+code_size([_|T], N) :- code_size(T, N1), N is N1 + 1.
+
+% ============================================================
+% collect strings
+% ============================================================
+
+% collect_strings(StringDefs, StartOffset, StringMap, StringBytes)
+collect_strings([], _, [], []).
+collect_strings([string_def(Name, Bytes)|Rest], Offset, [Name-Offset|Map], AllBytes) :-
+    length(Bytes, Len),
+    NextOffset is Offset + Len,
+    collect_strings(Rest, NextOffset, Map, RestBytes),
+    append(Bytes, RestBytes, AllBytes).
+
+% ============================================================
 % resolve references
 % ============================================================
 
 resolve_ref(_, macro_call(label, _), []) :- !.
-resolve_ref(Labels, macro_call(branch, [L]), [branch(Addr)]) :- member(L-Addr, Labels), !.
-resolve_ref(Labels, macro_call(zbranch, [L]), [zbranch(Addr)]) :- member(L-Addr, Labels), !.
+resolve_ref(Refs, macro_call(branch, [L]), [branch(Addr)]) :- member(L-Addr, Refs), !.
+resolve_ref(Refs, macro_call(zbranch, [L]), [zbranch(Addr)]) :- member(L-Addr, Refs), !.
+resolve_ref(Refs, macro_call(call, [L]), [call(Addr)]) :- member(L-Addr, Refs), !.
+resolve_ref(Refs, macro_call(addrofstr, [N]), [lit, Addr]) :- member(N-Addr, Refs), !.
 resolve_ref(_, X, [X]).
