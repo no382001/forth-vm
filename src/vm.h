@@ -6,7 +6,7 @@
 #include <cstdio>
 #include <string_view>
 
-using cell_t = int8_t;
+using cell_t = int16_t;
 using ucell_t = std::make_unsigned_t<cell_t>;
 
 constexpr size_t CELL_SIZE = sizeof(cell_t);
@@ -85,6 +85,7 @@ extern const std::array<op_info, OP_COUNT> dispatch;
 struct vm {
   std::array<uint8_t, MEMORY_SIZE> mem{};
   bool running{true};
+  bool debug{false};
 
   auto ip() -> ucell_t & { return *reinterpret_cast<ucell_t *>(&mem[IP_ADDR]); }
   auto sp() -> ucell_t & { return *reinterpret_cast<ucell_t *>(&mem[SP_ADDR]); }

@@ -1,17 +1,10 @@
 #include "vm.h"
 #include <fstream>
+#include <getopt.h>
 #include <iostream>
 #include <span>
 #include <string_view>
 #include <vector>
-
-struct config {
-  std::string_view filename;
-  uint16_t load_addr = 0;
-  uint16_t run_addr = 0;
-  bool debug = false;
-  bool step = false;
-};
 
 auto load_from_file(vm& v, std::string_view path, uint16_t addr = 0) -> size_t {
   auto file = std::ifstream{std::string{path}, std::ios::binary};
@@ -34,21 +27,49 @@ auto load_from_stdin(vm& v, uint16_t addr = 0) -> size_t {
   
   std::copy(bytes.begin(), bytes.end(), v.mem.begin() + addr);
   
-  if (!freopen("/dev/tty", "r", stdin)) { // re-tie pipe so we can do getchar etc.
+  if (!freopen("/dev/tty", "r", stdin)) {
     std::cerr << "warning: could not reopen stdin from /dev/tty\n";
   }
 
   return bytes.size();
 }
 
+auto usage(const char* prog) -> void {
+  std::cerr << "usage: " << prog << " [-t|--trace] [file]\n";
+  std::cerr << "\n";
+  std::cerr << "options:\n";
+  std::cerr << "  -t, --trace   trace execution\n";
+  std::cerr << "  -h, --help    show this help\n";
+}
+
 auto main(int argc, char** argv) -> int {
+  
+  static struct option long_options[] = {
+    {"trace", no_argument, nullptr, 't'},
+    {"help",  no_argument, nullptr, 'h'},
+    {nullptr, 0, nullptr, 0}
+  };
+  
   auto v = vm{};
+  int opt;
+  while ((opt = getopt_long(argc, argv, "th", long_options, nullptr)) != -1) {
+    switch (opt) {
+      case 't':
+        v.debug = true;
+        break;
+      case 'h':
+        usage(argv[0]);
+        return 0;
+      default:
+        usage(argv[0]);
+        return 1;
+    }
+  }
+  
   init(v);
   
-  auto args = std::span{argv, static_cast<size_t>(argc)};
-  
-  if (args.size() > 1) {
-    load_from_file(v, args[1]);
+  if (optind < argc) {
+    load_from_file(v, argv[optind]);
   } else {
     load_from_stdin(v);
   }

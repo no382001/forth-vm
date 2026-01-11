@@ -193,6 +193,33 @@ auto step(vm &v) -> void {
 
   const auto &info = dispatch[opcode];
 
+  if (v.debug) {
+    std::fprintf(stderr, "%04x\t%s", prev_ip, info.name.data());
+    
+    // peek at operand for instructions that have one
+    switch (opcode) {
+      case LIT:
+      case TRAP:
+        std::fprintf(stderr, "\t%d", read_cell(v, v.ip()));
+        break;
+      case BRANCH:
+      case ZBRANCH:
+      case CALL:
+        std::fprintf(stderr, "\t->%04x", static_cast<ucell_t>(read_cell(v, v.ip())));
+        break;
+      default:
+        break;
+    }
+    
+    // print stack
+    std::fprintf(stderr, "\t[");
+    for (ucell_t i = 0; i < v.sp(); ++i) {
+      std::fprintf(stderr, "%d", v.ds(i));
+      if (i < v.sp() - 1) std::fprintf(stderr, " ");
+    }
+    std::fprintf(stderr, "]\n");
+  }
+
   if (v.sp() < info.in) {
     std::fprintf(stderr, "error: stack underflow at ip=%u (%s needs %d, sp=%u)\n",
                  prev_ip, info.name.data(), info.in, v.sp());
