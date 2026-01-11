@@ -4,7 +4,10 @@ CXXFLAGS := \
     -Wall \
     -Wextra \
     -Wpedantic \
-    -Werror
+    -g
+
+CXXFLAGS += -fsanitize=address -fno-omit-frame-pointer
+LDFLAGS += -fsanitize=address
 
 TARGET := vm
 CODEGEN := codegen
@@ -18,14 +21,13 @@ OBJS := $(SRCS:src/%.cpp=$(BUILD_DIR)/%.o)
 CODEGEN_SRCS := src/codegen.cpp $(filter-out src/main.cpp, $(SRCS))
 CODEGEN_OBJS := $(BUILD_DIR)/codegen.o $(filter-out $(BUILD_DIR)/main.o, $(OBJS))
 
-.PHONY: all
 all: $(TARGET) $(GEN_DIR)/gen.pl
 
 $(TARGET): $(OBJS)
-	$(CXX) $(OBJS) -o $@
+	$(CXX) $(LDFLAGS) $(OBJS) -o $@
 
 $(CODEGEN): $(CODEGEN_OBJS)
-	$(CXX) $(CODEGEN_OBJS) -o $@
+	$(CXX) $(LDFLAGS) $(CODEGEN_OBJS) -o $@
 
 $(GEN_DIR)/gen.pl: $(CODEGEN) | $(GEN_DIR)
 	./$(CODEGEN) > $@
@@ -51,5 +53,6 @@ format:
 format-check:
 	clang-format --dry-run --Werror $(wildcard src/*.cpp) $(HDRS)
 
-.PHONY test:
+.PHONY: test
+test:
 	swipl -g "['assembler/tests/assemble.plt'], ['assembler/tests/macro.plt'], run_tests." -t halt

@@ -95,31 +95,50 @@ process(binary, Source, Result) :-
 
 assemble_binary(Code, ok(Bytes)) :-
     gen:cell_size(CellSize),
-    maplist(encode_token(CellSize), Code, BytesList),
+    build_offset_map(Code, CellSize, 0, OffsetMap),
+    maplist(encode_token(CellSize, OffsetMap), Code, BytesList),
     append(BytesList, Bytes).
 
-encode_token(CellSize, Token, Bytes) :-
-    ( Token = branch(Addr) ->
+% Build a map from token index to byte offset
+build_offset_map([], _, _, []).
+build_offset_map([Token|Rest], CellSize, BytePos, [BytePos|RestMap]) :-
+    token_size(Token, CellSize, Size),
+    NextPos is BytePos + Size,
+    build_offset_map(Rest, CellSize, NextPos, RestMap).
+
+token_size(branch(_), CellSize, Size) :- Size is CellSize * 2.
+token_size(zbranch(_), CellSize, Size) :- Size is CellSize * 2.
+token_size(call(_), CellSize, Size) :- Size is CellSize * 2.
+token_size(Token, CellSize, CellSize) :-
+    Token \= branch(_),
+    Token \= zbranch(_),
+    Token \= call(_).
+
+encode_token(CellSize, OffsetMap, Token, Bytes) :-
+    ( Token = branch(Idx) ->
         gen:op(branch, Op, _, _, _, _),
         encode_cell(CellSize, Op, OpBytes),
-        encode_cell(CellSize, Addr, AddrBytes),
+        nth0(Idx, OffsetMap, ByteAddr),
+        encode_cell(CellSize, ByteAddr, AddrBytes),
         append(OpBytes, AddrBytes, Bytes)
-    ; Token = zbranch(Addr) ->
+    ; Token = zbranch(Idx) ->
         gen:op('0branch', Op, _, _, _, _),
         encode_cell(CellSize, Op, OpBytes),
-        encode_cell(CellSize, Addr, AddrBytes),
+        nth0(Idx, OffsetMap, ByteAddr),
+        encode_cell(CellSize, ByteAddr, AddrBytes),
         append(OpBytes, AddrBytes, Bytes)
-    ; Token = call(Addr) ->
+    ; Token = call(Idx) ->
         gen:op(call, Op, _, _, _, _),
         encode_cell(CellSize, Op, OpBytes),
-        encode_cell(CellSize, Addr, AddrBytes),
+        nth0(Idx, OffsetMap, ByteAddr),
+        encode_cell(CellSize, ByteAddr, AddrBytes),
         append(OpBytes, AddrBytes, Bytes)
     ; number(Token) ->
         encode_cell(CellSize, Token, Bytes)
     ; gen:op(Token, Op, _, _, _, _) ->
         encode_cell(CellSize, Op, Bytes)
     ;
-        format(user_error, "Unknown token: ~w~n", [Token]),
+        format(user_error, "unknown token: ~w~n", [Token]),
         halt(1)
     ).
 
