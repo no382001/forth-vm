@@ -1,5 +1,6 @@
 \ ============================================================
-\ TINY REPL: numbers and +
+\ tiny stack machine repl: can handle numbers,
+\ the `+`  and the `.` operator and extists on `bye`
 \ ============================================================
 
 def(INBUF,768)
@@ -11,6 +12,8 @@ string(s_dot,".")
 string(s_bye,"bye")
 
 branch(main)
+
+include("programs/stdlib.ma")
 
 \ ============================================================
 \ user stack
@@ -195,20 +198,3 @@ label(mod10_loop)
 label(mod10_cont)
     lit 10 -
     branch(mod10_loop)
-
-\ ============================================================
-\ strcmp
-\ ============================================================
-
-label(strcmp)
-    over c@ over c@
-    over over = zbranch(strcmp_no)
-    drop zbranch(strcmp_yes)
-    swap lit 1 + swap lit 1 +
-    branch(strcmp)
-
-label(strcmp_yes)
-    drop drop lit 0 lit 1 - ret
-
-label(strcmp_no)
-    drop drop drop drop lit 0 ret

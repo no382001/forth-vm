@@ -1,8 +1,2 @@
-add string(varname,"hello world") nullterm'd
-add addrofstr(varname) that works just like labels but pops the address
-
-i should add more debugging info, like where the kernel addresses are, maybe i could actively hexdump system memory into a pipe, or print tagged memory regions 
-
-number parsing seems to work, but im also not sure about how to test these stdlib words, should i make an include function?
 
 -> this is all leading up to implementing the dictionary
