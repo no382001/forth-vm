@@ -180,8 +180,8 @@ const std::array<op_info, OP_COUNT> dispatch = {{
 
 auto step(vm &v) -> void {
   if (v.ip() >= MEMORY_SIZE) {
-    std::fprintf(stderr, "error: ip out of bounds (ip=%u, max=%zu)\n", 
-                 v.ip(), MEMORY_SIZE - 1);
+    std::fprintf(stderr, "error: ip out of bounds (ip=%u, max=%zu)\n", v.ip(),
+                 MEMORY_SIZE - 1);
     exit(1);
     return;
   }
@@ -190,7 +190,8 @@ auto step(vm &v) -> void {
   auto opcode = static_cast<uint8_t>(fetch_cell(v));
 
   if (opcode >= OP_COUNT) {
-    std::fprintf(stderr, "error: invalid opcode %d at ip=%u\n", opcode, prev_ip);
+    std::fprintf(stderr, "error: invalid opcode %d at ip=%u\n", opcode,
+                 prev_ip);
     exit(1);
     return;
   }
@@ -199,41 +200,45 @@ auto step(vm &v) -> void {
 
   if (v.debug) {
     std::fprintf(stderr, "%04x\t%s", prev_ip, info.name.data());
-    
+
     // peek at operand for instructions that have one
     switch (opcode) {
-      case LIT:
-      case TRAP:
-        std::fprintf(stderr, "\t%d", read_cell(v, v.ip()));
-        break;
-      case BRANCH:
-      case ZBRANCH:
-      case CALL:
-        std::fprintf(stderr, "\t->%04x", static_cast<ucell_t>(read_cell(v, v.ip())));
-        break;
-      default:
-        break;
+    case LIT:
+    case TRAP:
+      std::fprintf(stderr, "\t%d", read_cell(v, v.ip()));
+      break;
+    case BRANCH:
+    case ZBRANCH:
+    case CALL:
+      std::fprintf(stderr, "\t->%04x",
+                   static_cast<ucell_t>(read_cell(v, v.ip())));
+      break;
+    default:
+      break;
     }
-    
+
     // print stack
     std::fprintf(stderr, "\t[");
     for (ucell_t i = 0; i < v.sp(); ++i) {
       std::fprintf(stderr, "%d", v.ds(i));
-      if (i < v.sp() - 1) std::fprintf(stderr, " ");
+      if (i < v.sp() - 1)
+        std::fprintf(stderr, " ");
     }
     std::fprintf(stderr, "]\n");
   }
 
   if (v.sp() < info.in) {
-    std::fprintf(stderr, "error: stack underflow at ip=%u (%s needs %d, sp=%u)\n",
+    std::fprintf(stderr,
+                 "error: stack underflow at ip=%u (%s needs %d, sp=%u)\n",
                  prev_ip, info.name.data(), info.in, v.sp());
     exit(1);
     return;
   }
 
   if (v.rp() < info.rin) {
-    std::fprintf(stderr, "error: return stack underflow at ip=%u (%s needs %d, rp=%u)\n",
-                 prev_ip, info.name.data(), info.rin, v.rp());
+    std::fprintf(
+        stderr, "error: return stack underflow at ip=%u (%s needs %d, rp=%u)\n",
+        prev_ip, info.name.data(), info.rin, v.rp());
     exit(1);
     return;
   }
