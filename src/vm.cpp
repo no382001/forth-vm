@@ -2,6 +2,7 @@
 #include <array>
 #include <cassert>
 #include <cstdint>
+#include <stdlib.h>
 #include <string_view>
 
 inline auto push(vm &v, cell_t x) -> void { v.ds(v.sp()++) = x; }
@@ -139,6 +140,9 @@ inline auto h_trap(vm &v) -> void {
   case TRAP_BYE:
     v.running = false;
     break;
+  case TRAP_ASSERT:
+    exit(1);
+    break;
   default:
     assert(false && "unknown trap");
     break;
@@ -178,7 +182,7 @@ auto step(vm &v) -> void {
   if (v.ip() >= MEMORY_SIZE) {
     std::fprintf(stderr, "error: ip out of bounds (ip=%u, max=%zu)\n", 
                  v.ip(), MEMORY_SIZE - 1);
-    v.running = false;
+    exit(1);
     return;
   }
 
@@ -187,7 +191,7 @@ auto step(vm &v) -> void {
 
   if (opcode >= OP_COUNT) {
     std::fprintf(stderr, "error: invalid opcode %d at ip=%u\n", opcode, prev_ip);
-    v.running = false;
+    exit(1);
     return;
   }
 
@@ -223,14 +227,14 @@ auto step(vm &v) -> void {
   if (v.sp() < info.in) {
     std::fprintf(stderr, "error: stack underflow at ip=%u (%s needs %d, sp=%u)\n",
                  prev_ip, info.name.data(), info.in, v.sp());
-    v.running = false;
+    exit(1);
     return;
   }
 
   if (v.rp() < info.rin) {
     std::fprintf(stderr, "error: return stack underflow at ip=%u (%s needs %d, rp=%u)\n",
                  prev_ip, info.name.data(), info.rin, v.rp());
-    v.running = false;
+    exit(1);
     return;
   }
 

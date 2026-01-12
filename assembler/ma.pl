@@ -106,6 +106,7 @@ build_offset_map([Token|Rest], CellSize, BytePos, [BytePos|RestMap]) :-
     NextPos is BytePos + Size,
     build_offset_map(Rest, CellSize, NextPos, RestMap).
 
+token_size(byte(_), _, 1).
 token_size(branch(_), CellSize, Size) :- Size is CellSize * 2.
 token_size(zbranch(_), CellSize, Size) :- Size is CellSize * 2.
 token_size(call(_), CellSize, Size) :- Size is CellSize * 2.
@@ -133,6 +134,8 @@ encode_token(CellSize, OffsetMap, Token, Bytes) :-
         nth0(Idx, OffsetMap, ByteAddr),
         encode_cell(CellSize, ByteAddr, AddrBytes),
         append(OpBytes, AddrBytes, Bytes)
+    ; Token = byte(B) ->
+        Bytes = [B]
     ; number(Token) ->
         encode_cell(CellSize, Token, Bytes)
     ; gen:op(Token, Op, _, _, _, _) ->
