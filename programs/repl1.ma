@@ -2,9 +2,9 @@
 \ TINY REPL: numbers and +
 \ ============================================================
 
-def(INBUF,128)
-def(USP,160)
-def(USTACK,161)
+def(INBUF,768)
+def(USP,832)
+def(USTACK,833)
 
 string(s_add,"+")
 string(s_dot,".")
@@ -58,16 +58,18 @@ label(got_char)
     lit subst(INBUF)
 
 label(read_loop)
-    swap over c!         \ store char
+    swap over c!         \ store char (expects: char addr)
     lit 1 +              \ addr++
-    trap 1
+    trap 1               \ read next char (stack: addr char)
     dup lit 32 = zbranch(check_nl2)
     drop lit 0 swap c!
     ret
 label(check_nl2)
-    dup lit 10 = zbranch(read_loop)
+    dup lit 10 = zbranch(continue_read)
     drop lit 0 swap c!
     ret
+label(continue_read)
+    swap branch(read_loop)
 
 \ ============================================================
 \ dispatch
@@ -122,13 +124,13 @@ label(pn_loop)
 label(pn_check_hi)
     dup lit 58 < zbranch(pn_bad)
 
-    \ digit: acc = acc*10 + (c-48)
     lit 48 -             \ ( acc addr digit )
-    >r                   \ R:( digit )
-    swap                 \ ( addr acc )
-    dup + dup + dup +    \ acc*8
-    swap dup + +         \ acc*8 + acc*2 = acc*10
-    r> +                 \ + digit
+    >r                   \ R:( digit ), ( acc addr )
+    >r                   \ R:( digit addr ), ( acc )
+    dup dup + dup + dup +  \ ( acc acc*8 )
+    swap dup + +         \ ( acc*10 )
+    r> swap              \ ( addr acc*10 )
+    r> +                 \ ( addr acc*10+digit ) = ( addr acc' )
     swap lit 1 +         \ ( acc' addr+1 )
     branch(pn_loop)
 

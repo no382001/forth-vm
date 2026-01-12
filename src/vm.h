@@ -10,7 +10,7 @@ using cell_t = int16_t;
 using ucell_t = std::make_unsigned_t<cell_t>;
 
 constexpr size_t CELL_SIZE = sizeof(cell_t);
-constexpr size_t MEMORY_SIZE = 65536;
+constexpr size_t MEMORY_SIZE = 0xFFFF;
 constexpr size_t STACK_SIZE = 256;
 
 using addr_t = std::conditional_t<(MEMORY_SIZE <= 0xFF), uint8_t,
