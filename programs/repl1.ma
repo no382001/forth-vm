@@ -5,7 +5,7 @@
 
 def(INBUF,768)
 def(USP,832)
-def(USTACK,833)
+def(USTACK,834)
 
 string(s_add,"+")
 string(s_dot,".")
@@ -13,7 +13,7 @@ string(s_bye,"bye")
 
 branch(main)
 
-include("programs/stdlib.ma")
+include("programs/stdlib.ma") \ strcmp
 
 \ ============================================================
 \ user stack
@@ -21,15 +21,15 @@ include("programs/stdlib.ma")
 
 \ upush: ( n -- )
 label(upush)
-    lit subst(USP) c@
-    lit subst(USTACK) + c!
-    lit subst(USP) c@ lit 1 + lit subst(USP) c!
+    lit subst(USP) @
+    lit subst(USTACK) + !
+    lit subst(USP) @ lit 2 + lit subst(USP) !
     ret
 
 \ upop: ( -- n )
 label(upop)
-    lit subst(USP) c@ lit 1 - dup lit subst(USP) c!
-    lit subst(USTACK) + c@
+    lit subst(USP) @ lit 2 - dup lit subst(USP) !
+    lit subst(USTACK) + @
     ret
 
 \ ============================================================
@@ -37,7 +37,7 @@ label(upop)
 \ ============================================================
 
 label(main)
-    lit 0 lit subst(USP) c!     \ init user stack
+    lit 0 lit subst(USP) !     \ init user stack
 
 label(repl)
     call(readword)
@@ -85,6 +85,7 @@ label(dispatch)
     trap 2
 
 label(try_add)
+    \ +
     lit subst(INBUF) addrofstr(s_add) call(strcmp)
     zbranch(try_dot)
     call(upop) call(upop) +
@@ -92,6 +93,7 @@ label(try_add)
     ret
 
 label(try_dot)
+    \ .
     lit subst(INBUF) addrofstr(s_dot) call(strcmp)
     zbranch(try_num)
     call(upop) call(print_num)
@@ -99,12 +101,14 @@ label(try_dot)
     ret
 
 label(try_num)
+    \ <n>
     lit subst(INBUF) call(parse_num)
     zbranch(unknown)
     call(upush)
     ret
 
 label(unknown)
+    \ print `?`
     drop
     lit 63 trap 0
     lit 10 trap 0
@@ -141,8 +145,8 @@ label(pn_bad)
     drop drop drop lit 0 lit 0 ret
 
 label(pn_ok)
-    drop swap drop       \ ( acc )
-    lit 0 lit 1 -        \ -1 = success
+    drop drop            \ drop the 0 and addr
+    lit 0 lit 1 -        \ push -1 (success flag)
     ret
 
 \ ============================================================
@@ -182,7 +186,7 @@ label(print_zero)
 \ ============================================================
 
 label(div10)
-    lit 0 swap           \ ( 0 n )
+    lit 0 swap
 label(div10_loop)
     dup lit 10 < zbranch(div10_cont)
     drop ret
