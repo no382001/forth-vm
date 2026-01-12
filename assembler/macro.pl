@@ -1,6 +1,7 @@
 :- module(macro, [resolve/2]).
 
 :- use_module(assemble).
+:- use_module(gen/gen).
 
 resolve(Source, Result) :-
     assemble:tokenize(Source, ok(Tokens)),
@@ -13,9 +14,11 @@ resolve(Source, Result) :-
     % collect labels from code
     collect_labels(Code, 0, Labels),
     
-    % figure out where strings go (after code)
-    code_size(Code, CodeSize),
-    collect_strings(StringDefs, CodeSize, StringMap, StringBytes),
+    % figure out where strings go (after code) - IN BYTES!
+    code_size(Code, TokenCount),
+    gen:cell_size(CellSize),
+    CodeBytes is TokenCount * CellSize,
+    collect_strings(StringDefs, CodeBytes, StringMap, StringBytes),
     
     % resolve all references
     append(Labels, StringMap, AllRefs),
@@ -27,6 +30,11 @@ resolve(Source, Result) :-
     Result = ok(Resolved).
 
 is_string_def(string_def(_, _)).
+
+load_terms(File, Terms) :-
+    read_file_to_string(File, Src, []),
+    assemble:tokenize(Src, ok(Toks)),
+    phrase(parse_terms(Terms), Toks).
 
 % ============================================================
 % parsing
@@ -43,6 +51,15 @@ parse_term(string_def(Name, Bytes)) -->
       parse_string_macro(S, Name, Bytes)
     }, !.
 
+parse_term(include(File)) -->
+    [Tok],
+    { atom(Tok),
+      atom_string(Tok, S),
+      sub_string(S, 0, 8, _, "include("),
+      sub_string(S, 8, _, 1, Inner),
+      sub_string(Inner, 1, _, 1, File)
+    }.
+
 parse_term(macro_call(Name, Args)) -->
     [Tok],
     { atom_string(Tok, S), sub_string(S, _, _, _, "("),
@@ -56,6 +73,7 @@ parse_term(Tok) --> [Tok].
 parse_arg(Str, Num) :- number_string(Num, Str), !.
 parse_arg(Str, Atom) :- atom_string(Atom, Str).
 
+% TODO: I hate looking at a solution like this!
 % parse string(name,"content") -> Name, Bytes (null-terminated)
 parse_string_macro(S, Name, Bytes) :-
     sub_string(S, 7, _, 1, Inside),  % strip "string(" and ")"
@@ -72,6 +90,12 @@ parse_string_macro(S, Name, Bytes) :-
 % ============================================================
 
 expand_macros([], _, []).
+
+expand_macros([include(File)|T], Defs, Out) :-
+    load_terms(File, Terms),
+    expand_macros(Terms, Defs, IncOut),
+    expand_macros(T, Defs, RestOut),
+    append(IncOut, RestOut, Out).
 
 expand_macros([macro_call(def, [N, V])|T], Defs, Out) :-
     expand_macros(T, [N-V|Defs], Out).
@@ -123,13 +147,13 @@ code_size([_|T], N) :- code_size(T, N1), N is N1 + 1.
 % collect strings
 % ============================================================
 
-% collect_strings(StringDefs, StartOffset, StringMap, StringBytes)
 collect_strings([], _, [], []).
 collect_strings([string_def(Name, Bytes)|Rest], Offset, [Name-Offset|Map], AllBytes) :-
     length(Bytes, Len),
     NextOffset is Offset + Len,
     collect_strings(Rest, NextOffset, Map, RestBytes),
-    append(Bytes, RestBytes, AllBytes).
+    maplist([B, byte(B)]>>true, Bytes, WrappedBytes),
+    append(WrappedBytes, RestBytes, AllBytes).
 
 % ============================================================
 % resolve references

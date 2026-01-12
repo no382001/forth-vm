@@ -28,6 +28,7 @@ enum trap : uint8_t {
   TRAP_EMIT = 0, // ( char -- )
   TRAP_KEY = 1,  // ( -- char )
   TRAP_BYE = 2,  // ( -- ) exit
+  TRAP_ASSERT = 3, // ( -- ) exit(1)
 };
 
 enum op : uint8_t {
