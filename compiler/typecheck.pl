@@ -233,6 +233,7 @@ types_compatible(ptr(_), int) :- !.
 
 numeric_type(int).
 numeric_type(byte).
+numeric_type(ptr(_)).
 
 %% ============================================================
 %% test helper: parse -> ast -> typecheck pipeline

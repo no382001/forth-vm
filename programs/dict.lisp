@@ -40,7 +40,7 @@
 
 ;; compare two null-terminated byte strings
 ;; uses: T4
-(def streq ((a : int) (b : int)) : bool
+(def streq ((a : (ptr byte)) (b : (ptr byte))) : bool
   (store T4 0)
   (while (if (= (deref8 (+ a (deref T4))) (deref8 (+ b (deref T4))))
            (!= (deref8 (+ a (deref T4))) 0)
@@ -50,7 +50,7 @@
 
 ;; print null-terminated string
 ;; uses: T0
-(def print_str ((s : int)) : void
+(def print_str ((s : (ptr byte))) : void
   (store T0 0)
   (while (!= (deref8 (+ s (deref T0))) 0)
     (emit (deref8 (+ s (deref T0))))
@@ -65,7 +65,7 @@
   (store HERE HEAP))
 
 ;; add entry: link=LATEST, name ptr, xt; update LATEST and HERE
-(def dict_add ((name : int) (xt : int)) : void
+(def dict_add ((name : (ptr byte)) (xt : int)) : void
   (let ((h (deref HERE)))
     (store h (deref LATEST))
     (store (+ h 2) name)
@@ -75,7 +75,7 @@
 
 ;; find word in dictionary, return xt or 0
 ;; uses: T1 (walker), T2 (result)
-(def dict_find ((name : int)) : int
+(def dict_find ((name : (ptr byte))) : int
   (store T1 (deref LATEST))
   (store T2 0)
   (while (if (!= (deref T1) 0) (= (deref T2) 0) (< 1 0))
