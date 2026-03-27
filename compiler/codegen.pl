@@ -2,13 +2,29 @@
 
 :- use_module(library(lists)).
 
+:- dynamic(user_void_func/1).
+
 %% ============================================================
 %% entry
 %% ============================================================
 
 compile_program(Defs, ok(Code)) :-
     collect_consts(Defs, Consts),
-    compile_defs(Defs, Consts, 0, 512, Code).
+    register_void_funcs(Defs),
+    compile_defs(Defs, Consts, 0, 4096, Code).
+
+register_void_funcs(Defs) :-
+    retractall(user_void_func(_)),
+    register_void_funcs_(Defs).
+
+register_void_funcs_([]).
+register_void_funcs_([Def | Rest]) :-
+    ( Def = def(Name, _, void, _) ->
+        assertz(user_void_func(Name))
+    ;
+        true
+    ),
+    register_void_funcs_(Rest).
 
 %% ============================================================
 %% collect top-level constants for inlining
@@ -35,19 +51,22 @@ compile_def(const(_, _, _), _, LN, Slot, [], LN, Slot).
 
 compile_def(def(Name, Params, _RetType, Body), Consts, LN0, Slot0, Code, LN, SlotAfter) :-
     %% Allocate slots for params
-    alloc_params(Params, Slot0, Env, SlotParams),
+    alloc_params(Params, Slot0, ParamEnv, SlotParams),
     %% Generate prologue: pop args from stack into memory slots
     %% Args arrive on stack: rightmost on top (Forth convention)
     %% So we pop in param order (last param first from stack)
-    reverse(Env, RevEnv),
-    prologue(RevEnv, PrologueCode),
+    reverse(ParamEnv, RevParams),
+    prologue(RevParams, PrologueCode),
+    %% Add base sentinel so let bindings start at this function's slot range
+    BaseSlot is Slot0 - 2,
+    BodyEnv = [var('_base_', BaseSlot) | ParamEnv],
     %% Compile body
-    compile_body(Body, Env, Consts, LN0, BodyCode, LN),
+    compile_body(Body, BodyEnv, Consts, LN0, BodyCode, LN),
     %% Assemble: label + prologue + body + ret
     append(PrologueCode, BodyCode, InnerCode),
     append([label(Name) | InnerCode], [op(ret)], Code),
-    %% next function can reuse slots (no recursion)
-    SlotAfter = SlotParams.
+    %% Reserve 16 bytes for let bindings beyond params
+    SlotAfter is SlotParams + 16.
 
 alloc_params([], Slot, [], Slot).
 alloc_params([param(Name, _Type) | Rest], Slot, [var(Name, Slot) | Env], SlotOut) :-
@@ -78,6 +97,7 @@ void_expr(store(_, _)).
 void_expr(store8(_, _)).
 void_expr(while(_, _)).
 void_expr(call(Name, _)) :- builtin_trap(Name, void, _).
+void_expr(call(Name, _)) :- user_void_func(Name).
 void_expr(let(_, Body)) :- last_void(Body).
 void_expr(do(Exprs)) :- last_void(Exprs).
 void_expr(if(_, T, E)) :- void_expr(T), void_expr(E).
@@ -207,7 +227,7 @@ compile_let([bind(Name, Expr) | Rest], Env, Consts, LN0, Code, ExtEnv, LN) :-
     append(ExprCode, StoreCode, BindCode),
     append(BindCode, RestCode, Code).
 
-max_addr([], 510).  % base - 2, so first alloc = 512
+max_addr([], 4094).  % base - 2, so first alloc = 4096
 max_addr([var(_, A) | Rest], Max) :-
     max_addr(Rest, RestMax),
     ( A > RestMax -> Max = A ; Max = RestMax ).
