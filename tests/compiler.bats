@@ -194,6 +194,26 @@ setup() {
 }
 
 @test "e2e: dict program" {
-  run run_program_file "$BATS_TEST_DIRNAME/../programs/dict.lisp" $'hello\nwords\nfoo\nbye\n'
+  run run_program_file "$BATS_TEST_DIRNAME/../programs/dict.sets" $'hello\nwords\nfoo\nbye\n'
   [ "$output" = $'Hello!\nwords hello bye \nfoo ?' ]
+}
+
+@test "e2e: forth repl arithmetic" {
+  run run_program_file "$BATS_TEST_DIRNAME/../programs/forth.sets" $'1 2 + .\nbye\n'
+  [[ "$output" == *"3 "* ]]
+}
+
+@test "e2e: forth repl stack ops" {
+  run run_program_file "$BATS_TEST_DIRNAME/../programs/forth.sets" $'5 dup * .\nbye\n'
+  [[ "$output" == *"25 "* ]]
+}
+
+@test "e2e: forth repl number parsing" {
+  run run_program_file "$BATS_TEST_DIRNAME/../programs/forth.sets" $'42 .\nbye\n'
+  [[ "$output" == *"42 "* ]]
+}
+
+@test "e2e: forth repl unknown word" {
+  run run_program_file "$BATS_TEST_DIRNAME/../programs/forth.sets" $'foo\nbye\n'
+  [[ "$output" == *"foo ?"* ]]
 }

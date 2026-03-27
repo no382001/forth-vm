@@ -11,7 +11,7 @@
 compile_program(Defs, ok(Code)) :-
     collect_consts(Defs, Consts),
     register_void_funcs(Defs),
-    compile_defs(Defs, Consts, 0, 4096, Code).
+    compile_defs(Defs, Consts, 0, 16384, Code).
 
 register_void_funcs(Defs) :-
     retractall(user_void_func(_)),
@@ -227,7 +227,7 @@ compile_let([bind(Name, Expr) | Rest], Env, Consts, LN0, Code, ExtEnv, LN) :-
     append(ExprCode, StoreCode, BindCode),
     append(BindCode, RestCode, Code).
 
-max_addr([], 4094).  % base - 2, so first alloc = 4096
+max_addr([], 16382).  % base - 2, so first alloc = 16384
 max_addr([var(_, A) | Rest], Max) :-
     max_addr(Rest, RestMax),
     ( A > RestMax -> Max = A ; Max = RestMax ).

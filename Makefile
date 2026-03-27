@@ -65,6 +65,6 @@ quad:
 bats: $(TARGET) $(GEN_DIR)/gen.pl
 	bats tests/
 
-# Compile .lisp programs to .bin
-programs/%.bin: programs/%.lisp $(GEN_DIR)/gen.pl
+# Compile .sets programs to .bin
+programs/%.bin: programs/%.sets $(GEN_DIR)/gen.pl
 	@cd compiler && scryer-prolog -f -g "use_module(compiler), compile_file('../$<', '../$@'), halt." < /dev/null

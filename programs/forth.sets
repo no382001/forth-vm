@@ -1,0 +1,391 @@
+;; ---- scratch cells ----
+(const STRI   int 32768)
+(const PRINTI int 32770)
+(const NAMEI  int 32772)
+(const WALKER int 32774)
+(const FOUND  int 32776)
+(const ITER   int 32778)
+(const CHAR   int 32780)
+
+;; ---- mul/divmod scratch ----
+(const REM    int 32782)
+(const DENOM  int 32784)
+(const SIGN   int 32786)
+(const QUOT   int 32788)
+
+;; ---- print_num scratch ----
+(const PN_VAL  int 32790)
+(const PN_IDX  int 32792)
+(const PN_BUF  int 32794)  ; digit buffer (12 bytes)
+
+;; ---- parse_num scratch ----
+(const PN_POS  int 32810)
+(const PN_SIGN int 32812)
+(const PN_ACC  int 32814)
+(const PN_OK   int 32816)
+
+;; ---- dictionary / interpreter state ----
+(const LATEST int 32820)
+(const HERE   int 32822)
+(const STATE  int 32824)   ; 0 = interpret (unused for now)
+
+;; ---- I/O buffers ----
+(const LBUF int 33000)     ; line buffer
+(const WBUF int 33500)     ; word token buffer
+
+;; ---- Forth data stack ----
+;; stack grows upward: DSP points to next free slot
+(const DSB  int 34000)     ; data stack base
+(const DSP  int 32826)     ; data stack pointer (cell addr)
+
+;; ---- heap ----
+(const HEAP int 35000)
+
+;; ============================================================
+;; arithmetic helpers (no hw multiply/divide)
+;; ============================================================
+
+;; multiply: no hw instruction
+
+(def mul ((a : int) (b : int)) : int
+  (store SIGN 1)
+  (if (< a 0) (do (store SIGN (- 0 (deref SIGN))) (store REM (- 0 a))) (store REM a))
+  (if (< b 0) (do (store SIGN (- 0 (deref SIGN))) (store DENOM (- 0 b))) (store DENOM b))
+  (store QUOT 0)
+  (while (< 0 (deref DENOM))
+    (store QUOT (+ (deref QUOT) (deref REM)))
+    (store DENOM (- (deref DENOM) 1)))
+  (if (< (deref SIGN) 0) (- 0 (deref QUOT)) (deref QUOT)))
+
+;; divide: no hw instruction
+
+(def divmod ((a : int) (b : int)) : int
+  (store SIGN 1)
+  (if (< a 0) (do (store SIGN (- 0 (deref SIGN))) (store REM (- 0 a))) (store REM a))
+  (if (< b 0) (do (store SIGN (- 0 (deref SIGN))) (store DENOM (- 0 b))) (store DENOM b))
+  (store QUOT 0)
+  (while (if (< (deref REM) (deref DENOM)) (< 1 0) (< 0 1))
+    (store REM (- (deref REM) (deref DENOM)))
+    (store QUOT (+ (deref QUOT) 1)))
+  (if (< (deref SIGN) 0) (- 0 (deref QUOT)) (deref QUOT)))
+
+;; ============================================================
+;; string utilities
+;; ============================================================
+
+(def streq ((a : (ptr byte)) (b : (ptr byte))) : bool
+  (store STRI 0)
+  (while (if (= (deref8 (+ a (deref STRI))) (deref8 (+ b (deref STRI))))
+           (!= (deref8 (+ a (deref STRI))) 0)
+           (< 1 0))
+    (store STRI (+ (deref STRI) 1)))
+  (= (deref8 (+ a (deref STRI))) (deref8 (+ b (deref STRI)))))
+
+(def print_str ((s : (ptr byte))) : void
+  (store PRINTI 0)
+  (while (!= (deref8 (+ s (deref PRINTI))) 0)
+    (emit (deref8 (+ s (deref PRINTI))))
+    (store PRINTI (+ (deref PRINTI) 1))))
+
+;; print a signed integer in decimal
+
+(def print_num ((n : int)) : void
+  (if (= n 0)
+    (emit 48)
+    (do
+      ;; negative
+      (if (< n 0)
+        (do (emit 45) (store PN_VAL (- 0 n)))
+        (store PN_VAL n))
+      ;; extract digits, remainder in REM
+      (store PN_IDX 0)
+      (while (< 0 (deref PN_VAL))
+        (store PN_VAL (divmod (deref PN_VAL) 10))
+        
+        (store8 (+ PN_BUF (deref PN_IDX)) (+ 48 (deref REM)))
+        (store PN_IDX (+ (deref PN_IDX) 1)))
+      ;; emit reversed
+      (while (< 0 (deref PN_IDX))
+        (store PN_IDX (- (deref PN_IDX) 1))
+        (emit (deref8 (+ PN_BUF (deref PN_IDX))))))))
+
+;; ============================================================
+;; dictionary
+;; ============================================================
+
+(def dict_init () : void
+  (store LATEST 0)
+  (store HERE HEAP))
+
+(def dict_add ((name : (ptr byte)) (xt : int)) : void
+  (let ((h (deref HERE)))
+    
+    (store NAMEI 0)
+    (while (!= (deref8 (+ name (deref NAMEI))) 0)
+      (store8 (+ (+ h 6) (deref NAMEI)) (deref8 (+ name (deref NAMEI))))
+      (store NAMEI (+ (deref NAMEI) 1)))
+    (store8 (+ (+ h 6) (deref NAMEI)) 0)
+    
+    (store h (deref LATEST))            ; link
+    (store (+ h 2) (+ h 6))            ; name ptr -> copied string
+    (store (+ h 4) xt)                  ; xt
+    (store LATEST h)
+    
+    (store HERE (+ (+ h 7) (deref NAMEI)))))
+
+(def dict_find ((name : (ptr byte))) : int
+  (store WALKER (deref LATEST))
+  (store FOUND 0)
+  (while (if (!= (deref WALKER) 0) (= (deref FOUND) 0) (< 1 0))
+    (if (streq name (deref (+ (deref WALKER) 2)))
+      (store FOUND (deref (+ (deref WALKER) 4)))
+      (store WALKER (deref (deref WALKER)))))
+  (deref FOUND))
+
+(def dict_words () : void
+  (store ITER (deref LATEST))
+  (while (!= (deref ITER) 0)
+    (print_str (deref (+ (deref ITER) 2)))
+    (emit 32)
+    (store ITER (deref (deref ITER))))
+  (emit 10))
+
+;; ============================================================
+;; Forth data stack
+;; ============================================================
+
+(def ds_init () : void
+  (store DSP DSB))
+
+(def ds_push ((v : int)) : void
+  (store (deref DSP) v)
+  (store DSP (+ (deref DSP) 2)))
+
+(def ds_pop () : int
+  (store DSP (- (deref DSP) 2))
+  (deref (deref DSP)))
+
+(def ds_depth () : int
+  (divmod (- (deref DSP) DSB) 2))
+
+(def ds_show () : void
+  (emit 60)
+  (print_num (ds_depth))
+  (emit 62)
+  (emit 32)
+  (store ITER DSB)
+  (while (< (deref ITER) (deref DSP))
+    (print_num (deref (deref ITER)))
+    (emit 32)
+    (store ITER (+ (deref ITER) 2))))
+
+;; ============================================================
+;; input
+;; ============================================================
+
+(def read_line () : int
+  (store ITER 0)
+  (while (do (store CHAR (key))
+             (if (= (deref CHAR) -1) (< 1 0)
+               (!= (deref CHAR) 10)))
+    (store8 (+ LBUF (deref ITER)) (deref CHAR))
+    (store ITER (+ (deref ITER) 1)))
+  (store8 (+ LBUF (deref ITER)) 0)
+  (if (if (= (deref CHAR) -1) (= (deref ITER) 0) (< 1 0))
+    -1
+    (deref ITER)))
+
+;; ============================================================
+;; tokenizer — walk LBUF extracting space-delimited words
+;; ============================================================
+
+;; LPOS tracks current position in LBUF
+(const LPOS int 32828)
+
+(def tok_init () : void
+  (store LPOS 0))
+
+(def tok_next () : int
+  
+  (while (= (deref8 (+ LBUF (deref LPOS))) 32)
+    (store LPOS (+ (deref LPOS) 1)))
+  
+  (if (= (deref8 (+ LBUF (deref LPOS))) 0)
+    0
+    (do
+      
+      (store ITER 0)
+      (while (if (!= (deref8 (+ LBUF (deref LPOS))) 0)
+               (!= (deref8 (+ LBUF (deref LPOS))) 32)
+               (< 1 0))
+        (store8 (+ WBUF (deref ITER)) (deref8 (+ LBUF (deref LPOS))))
+        (store ITER (+ (deref ITER) 1))
+        (store LPOS (+ (deref LPOS) 1)))
+      (store8 (+ WBUF (deref ITER)) 0)
+      (deref ITER))))
+
+;; ============================================================
+;; number parsing
+;; ============================================================
+
+(def parse_num () : bool
+  (store PN_POS 0)
+  (store PN_SIGN 1)
+  (store PN_ACC 0)
+  ;; optional leading minus
+  (if (= (deref8 WBUF) 45)
+    (do (store PN_SIGN -1) (store PN_POS 1))
+    (store PN_ACC 0))
+  
+  (if (= (deref8 (+ WBUF (deref PN_POS))) 0)
+    (< 1 0)
+    (do
+      (store PN_OK 1)
+      (while (if (!= (deref8 (+ WBUF (deref PN_POS))) 0)
+               (= (deref PN_OK) 1) (< 1 0))
+        (let ((c (deref8 (+ WBUF (deref PN_POS)))))
+          (if (if (< 47 c) (< c 58) (< 1 0))
+            (do
+              (store PN_ACC (+ (mul (deref PN_ACC) 10) (- c 48)))
+              (store PN_POS (+ (deref PN_POS) 1)))
+            (store PN_OK 0))))
+      (if (= (deref PN_OK) 1)
+        (do (store PN_ACC (mul (deref PN_ACC) (deref PN_SIGN)))
+            (< 0 1))
+        (< 1 0)))))
+
+;; ============================================================
+;; dispatch — execute Forth primitives by xt
+;; ============================================================
+
+;; xt assignments:
+;;   1  = bye        10 = over      19 = .s
+;;   2  = .          11 = =         20 = cr
+;;   3  = +          12 = <         21 = emit
+;;   4  = -          13 = >         22 = and
+;;   5  = *          14 = 0=        23 = or
+;;   6  = /          15 = negate    24 = xor
+;;   7  = dup        16 = abs       25 = mod
+;;   8  = swap       17 = words
+;;   9  = drop       18 = max
+
+(def dispatch ((xt : int)) : void
+  (if (= xt 1) (bye)
+  (if (= xt 2)  ;; .  ( n -- ) print top
+    (do (print_num (ds_pop)) (emit 32))
+  (if (= xt 3)  ;; +
+    (let ((b (ds_pop))) (ds_push (+ (ds_pop) b)))
+  (if (= xt 4)  ;; -
+    (let ((b (ds_pop))) (ds_push (- (ds_pop) b)))
+  (if (= xt 5)  ;; *
+    (let ((b (ds_pop))) (ds_push (mul (ds_pop) b)))
+  (if (= xt 6)  ;; /
+    (let ((b (ds_pop))) (ds_push (divmod (ds_pop) b)))
+  (if (= xt 7)  ;; dup
+    (let ((a (ds_pop))) (do (ds_push a) (ds_push a)))
+  (if (= xt 8)  ;; swap
+    (let ((b (ds_pop))) (let ((a (ds_pop))) (do (ds_push b) (ds_push a))))
+  (if (= xt 9)  ;; drop
+    (do (ds_pop) (store ITER 0))
+  (if (= xt 10) ;; over
+    (let ((b (ds_pop))) (let ((a (ds_pop))) (do (ds_push a) (ds_push b) (ds_push a))))
+  (if (= xt 11) ;; =
+    (let ((b (ds_pop))) (if (= (ds_pop) b) (ds_push -1) (ds_push 0)))
+  (if (= xt 12) ;; <
+    (let ((b (ds_pop))) (if (< (ds_pop) b) (ds_push -1) (ds_push 0)))
+  (if (= xt 13) ;; >
+    (let ((b (ds_pop))) (if (< b (ds_pop)) (ds_push -1) (ds_push 0)))
+  (if (= xt 14) ;; 0=
+    (if (= (ds_pop) 0) (ds_push -1) (ds_push 0))
+  (if (= xt 15) ;; negate
+    (ds_push (- 0 (ds_pop)))
+  (if (= xt 16) ;; abs
+    (let ((a (ds_pop))) (if (< a 0) (ds_push (- 0 a)) (ds_push a)))
+  (if (= xt 17) ;; words
+    (dict_words)
+  (if (= xt 18) ;; max
+    (let ((b (ds_pop))) (let ((a (ds_pop))) (if (< a b) (ds_push b) (ds_push a))))
+  (if (= xt 19) ;; .s
+    (ds_show)
+  (if (= xt 20) ;; cr
+    (emit 10)
+  (if (= xt 21) ;; emit  ( n -- )
+    (emit (ds_pop))
+  (if (= xt 22) ;; and
+    (let ((b (ds_pop))) (ds_push (and (ds_pop) b)))
+  (if (= xt 23) ;; or
+    (let ((b (ds_pop))) (ds_push (or (ds_pop) b)))
+  (if (= xt 24) ;; xor
+    (let ((b (ds_pop))) (ds_push (xor (ds_pop) b)))
+  (if (= xt 25) ;; mod  ( a b -- a%b )
+    (let ((b (ds_pop)))
+      (let ((a (ds_pop)))
+        (do (divmod a b) (ds_push (deref REM)))))
+    (store ITER 0)))))))))))))))))))))))))))
+
+;; ============================================================
+;; interpret one word (in WBUF)
+;; ============================================================
+
+(def interpret_word () : void
+  (let ((xt (dict_find WBUF)))
+    (if (!= xt 0)
+      (dispatch xt)
+      ;; not a word — try as a number
+      (if (parse_num)
+        (ds_push (deref PN_ACC))
+        (do (print_str WBUF)
+            (print_str " ?")
+            (emit 10))))))
+
+;; ============================================================
+;; main
+;; ============================================================
+
+(def main () : void
+  (dict_init)
+  (ds_init)
+
+  ;; populate dictionary
+  (dict_add "bye" 1)
+  (dict_add "." 2)
+  (dict_add "+" 3)
+  (dict_add "-" 4)
+  (dict_add "*" 5)
+  (dict_add "/" 6)
+  (dict_add "dup" 7)
+  (dict_add "swap" 8)
+  (dict_add "drop" 9)
+  (dict_add "over" 10)
+  (dict_add "=" 11)
+  (dict_add "<" 12)
+  (dict_add ">" 13)
+  (dict_add "0=" 14)
+  (dict_add "negate" 15)
+  (dict_add "abs" 16)
+  (dict_add "words" 17)
+  (dict_add "max" 18)
+  (dict_add ".s" 19)
+  (dict_add "cr" 20)
+  (dict_add "emit" 21)
+  (dict_add "and" 22)
+  (dict_add "or" 23)
+  (dict_add "xor" 24)
+  (dict_add "mod" 25)
+
+  
+  (print_str "sets forth")
+  (emit 10)
+
+  
+  (while (< 0 1)
+    (let ((len (read_line)))
+      (if (= len -1) (bye)
+        (if (< 0 len)
+          (do
+            (tok_init)
+            (while (< 0 (tok_next))
+              (interpret_word))
+            (print_str " ok")
+            (emit 10))
+          (store ITER 0))))))

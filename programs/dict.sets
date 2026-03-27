@@ -1,60 +1,41 @@
-;; dict.lisp — Forth dictionary and simple REPL
-;;
-;; A linked-list dictionary mapping word names to execution tokens.
-;; Demonstrates: heap allocation, linked list traversal, string matching.
-;;
-;; Dictionary entry layout (6 bytes):
-;;   +0: link (cell) — previous entry, 0 = end
-;;   +2: name (cell) — pointer to null-terminated string
-;;   +4: xt   (cell) — execution token (integer tag)
-;;
-;; Memory map:
-;;   4096-4300: compiler variable slots
-;;   5000-5019: scratch cells
-;;   5050-5059: dictionary state
-;;   6000-6255: word input buffer
-;;   8000+:     dictionary heap
-
 ;; ---- scratch cells ----
-(const T0 int 5000)   ; print_str index
-(const T1 int 5002)   ; dict_find: entry walker
-(const T2 int 5004)   ; dict_find: result
-(const T3 int 5006)   ; read_line: index
-(const T4 int 5008)   ; streq: counter
-(const T5 int 5010)   ; dict_words: entry walker
-(const CH int 5012)   ; current input char
+(const PRINTI int 32768)   ; print_str index
+(const WALKER int 32770)   ; dict_find: entry walker
+(const FOUND  int 32772)   ; dict_find: result
+(const LINEI  int 32774)   ; read_line: index
+(const STRI   int 32776)   ; streq: counter
+(const ITER   int 32778)   ; dict_words: entry walker
+(const CHAR   int 32780)   ; current input char
 
 ;; ---- dictionary state ----
-(const LATEST int 5050)
-(const HERE   int 5052)
+(const LATEST int 32790)
+(const HERE   int 32792)
 
 ;; ---- I/O ----
-(const BUF int 6000)
+(const BUF int 33000)
 
 ;; ---- heap ----
-(const HEAP int 8000)
+(const HEAP int 35000)
 
 ;; ============================================================
 ;; string utilities
 ;; ============================================================
 
 ;; compare two null-terminated byte strings
-;; uses: T4
 (def streq ((a : (ptr byte)) (b : (ptr byte))) : bool
-  (store T4 0)
-  (while (if (= (deref8 (+ a (deref T4))) (deref8 (+ b (deref T4))))
-           (!= (deref8 (+ a (deref T4))) 0)
+  (store STRI 0)
+  (while (if (= (deref8 (+ a (deref STRI))) (deref8 (+ b (deref STRI))))
+           (!= (deref8 (+ a (deref STRI))) 0)
            (< 1 0))
-    (store T4 (+ (deref T4) 1)))
-  (= (deref8 (+ a (deref T4))) (deref8 (+ b (deref T4)))))
+    (store STRI (+ (deref STRI) 1)))
+  (= (deref8 (+ a (deref STRI))) (deref8 (+ b (deref STRI)))))
 
 ;; print null-terminated string
-;; uses: T0
 (def print_str ((s : (ptr byte))) : void
-  (store T0 0)
-  (while (!= (deref8 (+ s (deref T0))) 0)
-    (emit (deref8 (+ s (deref T0))))
-    (store T0 (+ (deref T0) 1))))
+  (store PRINTI 0)
+  (while (!= (deref8 (+ s (deref PRINTI))) 0)
+    (emit (deref8 (+ s (deref PRINTI))))
+    (store PRINTI (+ (deref PRINTI) 1))))
 
 ;; ============================================================
 ;; dictionary
@@ -74,24 +55,22 @@
     (store HERE (+ h 6))))
 
 ;; find word in dictionary, return xt or 0
-;; uses: T1 (walker), T2 (result)
 (def dict_find ((name : (ptr byte))) : int
-  (store T1 (deref LATEST))
-  (store T2 0)
-  (while (if (!= (deref T1) 0) (= (deref T2) 0) (< 1 0))
-    (if (streq name (deref (+ (deref T1) 2)))
-      (store T2 (deref (+ (deref T1) 4)))
-      (store T1 (deref (deref T1)))))
-  (deref T2))
+  (store WALKER (deref LATEST))
+  (store FOUND 0)
+  (while (if (!= (deref WALKER) 0) (= (deref FOUND) 0) (< 1 0))
+    (if (streq name (deref (+ (deref WALKER) 2)))
+      (store FOUND (deref (+ (deref WALKER) 4)))
+      (store WALKER (deref (deref WALKER)))))
+  (deref FOUND))
 
 ;; print all words in dictionary
-;; uses: T5
 (def dict_words () : void
-  (store T5 (deref LATEST))
-  (while (!= (deref T5) 0)
-    (print_str (deref (+ (deref T5) 2)))
+  (store ITER (deref LATEST))
+  (while (!= (deref ITER) 0)
+    (print_str (deref (+ (deref ITER) 2)))
     (emit 32)
-    (store T5 (deref (deref T5))))
+    (store ITER (deref (deref ITER))))
   (emit 10))
 
 ;; ============================================================
@@ -99,18 +78,17 @@
 ;; ============================================================
 
 ;; read a line into BUF, null-terminate, return length (-1 on EOF)
-;; uses: T3, CH
 (def read_line () : int
-  (store T3 0)
-  (while (do (store CH (key))
-             (if (= (deref CH) -1) (< 1 0)
-               (!= (deref CH) 10)))
-    (store8 (+ BUF (deref T3)) (deref CH))
-    (store T3 (+ (deref T3) 1)))
-  (store8 (+ BUF (deref T3)) 0)
-  (if (if (= (deref CH) -1) (= (deref T3) 0) (< 1 0))
+  (store LINEI 0)
+  (while (do (store CHAR (key))
+             (if (= (deref CHAR) -1) (< 1 0)
+               (!= (deref CHAR) 10)))
+    (store8 (+ BUF (deref LINEI)) (deref CHAR))
+    (store LINEI (+ (deref LINEI) 1)))
+  (store8 (+ BUF (deref LINEI)) 0)
+  (if (if (= (deref CHAR) -1) (= (deref LINEI) 0) (< 1 0))
     -1
-    (deref T3)))
+    (deref LINEI)))
 
 ;; ============================================================
 ;; dispatch — execute a word by its xt
@@ -125,7 +103,7 @@
   (if (= xt 1) (bye)
     (if (= xt 2) (do (print_str "Hello!") (emit 10))
       (if (= xt 3) (dict_words)
-        (store T0 0)))))
+        (store PRINTI 0)))))
 
 ;; ============================================================
 ;; main
@@ -148,4 +126,4 @@
             (if (= xt 0)
               (do (print_str BUF) (print_str " ?") (emit 10))
               (dispatch xt)))
-          (store T0 0))))))
+          (store PRINTI 0))))))

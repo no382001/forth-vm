@@ -1,0 +1,30 @@
+(const BUF int 1028)
+(const IDX int 1026)
+(const CHAR int 1024)
+
+(const STRI int 1022)
+
+(def streq ((a : int) (b : int)) : bool
+  (store STRI 0)
+  (while (if (= (deref8 (+ a (deref STRI))) (deref8 (+ b (deref STRI))))
+           (!= (deref8 (+ a (deref STRI))) 0)
+           (< 1 0))
+    (store STRI (+ (deref STRI) 1)))
+  (= (deref8 (+ a (deref STRI))) (deref8 (+ b (deref STRI)))))
+
+(def main () : void
+  (while (< 0 1)
+    (store IDX 0)
+    (while (do (store CHAR (key))
+               (!= (deref CHAR) 10))
+      (store8 (+ BUF (deref IDX)) (deref CHAR))
+      (store IDX (+ (deref IDX) 1)))
+    (store8 (+ BUF (deref IDX)) 0)
+
+    (if (streq BUF "bye")
+      (bye)
+      (do (store IDX 0)
+          (while (!= (deref8 (+ BUF (deref IDX))) 0)
+            (emit (deref8 (+ BUF (deref IDX))))
+            (store IDX (+ (deref IDX) 1)))
+          (emit 10)))))

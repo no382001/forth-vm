@@ -10,7 +10,7 @@ COMPILER_DIR="$FORTH_ROOT/compiler"
 compile() {
   local src="$1" target="${2:-binary}"
   local srcfile
-  srcfile="$(mktemp /tmp/forth-XXXXXX.lisp)"
+  srcfile="$(mktemp /tmp/forth-XXXXXX.sets)"
   printf '%s' "$src" > "$srcfile"
   (
     cd "$COMPILER_DIR"
@@ -29,8 +29,8 @@ compile() {
 run_program() {
   local src="$1" input="${2:-}"
   local srcfile binfile
-  srcfile="$(mktemp /tmp/forth-XXXXXX.lisp)"
-  binfile="${srcfile%.lisp}.bin"
+  srcfile="$(mktemp /tmp/forth-XXXXXX.sets)"
+  binfile="${srcfile%.sets}.bin"
   printf '%s' "$src" > "$srcfile"
   (
     cd "$COMPILER_DIR"
@@ -44,7 +44,7 @@ run_program() {
 }
 
 # run_program_file <lisp_file> [stdin_input]
-# Compile a .lisp file to binary, run it on the VM with optional input.
+# Compile a .sets file to binary, run it on the VM with optional input.
 run_program_file() {
   local srcfile="$1" input="${2:-}"
   local binfile
