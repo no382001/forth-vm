@@ -1,4 +1,4 @@
-:- module(compiler, [compile_source/2, compile_source/3]).
+:- module(compiler, [compile_source/2, compile_source/3, compile_file/2]).
 
 :- use_module(parser).
 :- use_module(ast).
@@ -9,6 +9,7 @@
 :- use_module(library(lists)).
 :- use_module(library(format)).
 :- use_module(library(charsio)).
+:- use_module(library(iso_ext)).
 
 %% compile_source(+Source, -Result)
 %% Result = ok(Bytes) | error(Stage, Detail)
@@ -16,43 +17,86 @@ compile_source(Source, Result) :-
     compile_source(Source, binary, Result).
 
 %% compile_source(+Source, +Target, -Result)
-%% Target = ast | typed | ir | binary
+%% Target = parsed | ast | typed | ir | binary
 compile_source(Source, Target, Result) :-
     %% Stage 1: parse
     parser:parse(Source, ParseResult),
-    ( ParseResult = ok(Forms) -> true
-    ; Result = error(parse, ParseResult), !
-    ),
-    ( Target = parsed -> Result = ok(Forms), ! ; true ),
+    ( ParseResult \= ok(_) ->
+        Result = error(parse, ParseResult)
+    ; ParseResult = ok(Forms),
+      ( Target = parsed ->
+          Result = ok(Forms)
+      ;
+          %% Stage 2: AST transform
+          ast:transform_program(Forms, AstResult),
+          ( AstResult \= ok(_) ->
+              Result = error(ast, AstResult)
+          ; AstResult = ok(Defs),
+            ( Target = ast ->
+                Result = ok(Defs)
+            ;
+                %% Stage 3: typecheck
+                typecheck:check_program(Defs, TcResult),
+                ( TcResult \= ok(_) ->
+                    Result = error(typecheck, TcResult)
+                ; TcResult = ok(TypedDefs),
+                  ( Target = typed ->
+                      Result = ok(TypedDefs)
+                  ;
+                      %% Stage 4: codegen
+                      codegen:compile_program(TypedDefs, CgResult),
+                      ( CgResult \= ok(_) ->
+                          Result = error(codegen, CgResult)
+                      ; CgResult = ok(Tokens),
+                        ( Target = ir ->
+                            Result = ok(Tokens)
+                        ;
+                            %% Stage 5: emit binary
+                            ( member(label(main), Tokens) ->
+                                append([branch(main)], Tokens, AllTokens)
+                            ;
+                                AllTokens = Tokens
+                            ),
+                            emit:emit_binary(AllTokens, Bytes),
+                            Result = ok(Bytes)
+                        )
+                      )
+                  )
+                )
+            )
+          )
+      )
+    ).
 
-    %% Stage 2: AST transform
-    ast:transform_program(Forms, AstResult),
-    ( AstResult = ok(Defs) -> true
-    ; Result = error(ast, AstResult), !
-    ),
-    ( Target = ast -> Result = ok(Defs), ! ; true ),
+%% ============================================================
+%% file compilation
+%% ============================================================
 
-    %% Stage 3: typecheck
-    typecheck:check_program(Defs, TcResult),
-    ( TcResult = ok(TypedDefs) -> true
-    ; Result = error(typecheck, TcResult), !
-    ),
-    ( Target = typed -> Result = ok(TypedDefs), ! ; true ),
-
-    %% Stage 4: codegen
-    codegen:compile_program(TypedDefs, CgResult),
-    ( CgResult = ok(Tokens) -> true
-    ; Result = error(codegen, CgResult), !
-    ),
-    ( Target = ir -> Result = ok(Tokens), ! ; true ),
-
-    %% Stage 5: emit binary
-    %% First, add entry point: branch to main then halt
-    ( member(label(main), Tokens) ->
-        Entry = [branch(main)],
-        append(Entry, Tokens, AllTokens)
+compile_file(InFile, OutFile) :-
+    read_source(InFile, Chars),
+    compile_source(Chars, binary, Result),
+    ( Result = ok(Bytes) ->
+        write_binary(OutFile, Bytes)
     ;
-        AllTokens = Tokens
-    ),
-    emit:emit_binary(AllTokens, Bytes),
-    Result = ok(Bytes).
+        format("compile error: ~w~n", [Result]),
+        halt(1)
+    ).
+
+read_source(File, Chars) :-
+    open(File, read, S),
+    get_chars(S, Chars),
+    close(S).
+
+get_chars(S, Chars) :-
+    get_char(S, C),
+    ( C = end_of_file ->
+        Chars = []
+    ;
+        Chars = [C|Rest],
+        get_chars(S, Rest)
+    ).
+
+write_binary(File, Bytes) :-
+    open(File, write, S, [type(binary)]),
+    maplist(put_byte(S), Bytes),
+    close(S).

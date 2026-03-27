@@ -152,19 +152,27 @@ infer(Env, FEnv, while(Cond, Body), void) :-
     infer(Env, FEnv, Cond, bool),
     infer_body(Body, Env, FEnv, _).
 
-%% deref: ptr(T) -> T
+%% deref: ptr(T) -> T, or int -> int (raw address)
 infer(Env, FEnv, deref(E), T) :-
-    infer(Env, FEnv, E, ptr(T)).
+    infer(Env, FEnv, E, ET),
+    (ET = ptr(T) ; (numeric_type(ET), T = int)).
 
-%% store: ptr(T) × T -> void
+%% deref8: ptr(byte)|int -> byte
+infer(Env, FEnv, deref8(E), byte) :-
+    infer(Env, FEnv, E, ET),
+    (ET = ptr(byte) ; numeric_type(ET)).
+
+%% store: ptr(T) × T -> void, or int addr
 infer(Env, FEnv, store(Addr, Val), void) :-
-    infer(Env, FEnv, Addr, ptr(T)),
+    infer(Env, FEnv, Addr, AT),
+    (AT = ptr(T) ; (numeric_type(AT), T = int)),
     infer(Env, FEnv, Val, VT),
     types_compatible(T, VT).
 
-%% store8: ptr(byte) × byte -> void
+%% store8: ptr(byte)|int × numeric -> void
 infer(Env, FEnv, store8(Addr, Val), void) :-
-    infer(Env, FEnv, Addr, ptr(byte)),
+    infer(Env, FEnv, Addr, AT),
+    (AT = ptr(byte) ; numeric_type(AT)),
     infer(Env, FEnv, Val, VT),
     numeric_type(VT).
 

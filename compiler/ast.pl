@@ -65,6 +65,10 @@ transform(list([sym(do) | Forms]),
 transform(list([sym(deref), E]), deref(TE)) :-
     transform(E, TE).
 
+%% (deref8 expr) — byte-level read
+transform(list([sym(deref8), E]), deref8(TE)) :-
+    transform(E, TE).
+
 %% (store addr val)
 transform(list([sym(store), A, V]), store(TA, TV)) :-
     transform(A, TA),

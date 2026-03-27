@@ -60,3 +60,7 @@ quad:
 	@cd compiler && for mod in parser typecheck codegen; do \
 		scryer-prolog -f -g "use_module(library('numerics/quadtests')), check_module_quads($$mod, _), halt." < /dev/null; \
 	done
+
+# Compile .lisp programs to .bin
+programs/%.bin: programs/%.lisp $(GEN_DIR)/gen.pl
+	@cd compiler && scryer-prolog -f -g "use_module(compiler), compile_file('../$<', '../$@'), halt." < /dev/null
