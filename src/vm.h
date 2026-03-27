@@ -30,7 +30,51 @@ enum trap : uint8_t {
   TRAP_KEY = 1,    // ( -- char )
   TRAP_BYE = 2,    // ( -- ) exit
   TRAP_ASSERT = 3, // ( -- ) exit(1)
+  TRAP_COUNT
 };
+
+// Type tags for codegen
+enum class vtype : uint8_t { VOID, INT, BYTE, BOOL };
+
+constexpr std::string_view vtype_str(vtype t) {
+  switch (t) {
+  case vtype::VOID:
+    return "void";
+  case vtype::INT:
+    return "int";
+  case vtype::BYTE:
+    return "byte";
+  case vtype::BOOL:
+    return "bool";
+  }
+  return "?";
+}
+
+// Compile-time type signature: sig<ReturnType, ParamTypes...>
+template <vtype Ret, vtype... Params> struct sig {
+  static constexpr vtype ret = Ret;
+  static constexpr std::array<vtype, sizeof...(Params)> params{Params...};
+};
+
+struct trap_info {
+  uint8_t code;
+  std::string_view name;
+  vtype ret;
+  std::array<vtype, 4> params;
+  uint8_t arity;
+};
+
+template <vtype Ret, vtype... Params>
+constexpr trap_info make_trap(uint8_t code, std::string_view name) {
+  return {code, name, Ret, {Params...}, sizeof...(Params)};
+}
+
+inline constexpr std::array<trap_info, TRAP_COUNT> traps = {{
+    make_trap<vtype::VOID, vtype::INT>(TRAP_EMIT, "emit"),
+    make_trap<vtype::INT>(TRAP_KEY, "key"),
+    make_trap<vtype::VOID>(TRAP_BYE, "bye"),
+    make_trap<vtype::VOID>(TRAP_ASSERT, "assert-fail"),
+}};
 
 enum op : uint8_t {
   // core

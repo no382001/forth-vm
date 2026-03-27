@@ -217,11 +217,11 @@ op_to_vm('<=', [op(swap), op('<'), lit(0), op('=')]).
 %% >= : < then invert
 op_to_vm('>=', [op('<'), lit(0), op('=')]).
 
-%% Built-in trap functions: name, return_type, code
-builtin_trap(emit, void, [lit(0), op(trap)]).
-builtin_trap(key, int, [lit(1), op(trap)]).
-builtin_trap(bye, void, [lit(2), op(trap)]).
-builtin_trap('assert-fail', void, [lit(3), op(trap)]).
+%% Built-in trap functions (from gen/gen.pl)
+:- use_module('../gen/gen').
+
+builtin_trap(Name, Ret, [lit(Code), op(trap)]) :-
+    gen:trap_type(Name, Code, _, Ret).
 
 %% ============================================================
 %% tests

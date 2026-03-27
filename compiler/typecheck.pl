@@ -16,13 +16,13 @@ check_program(Defs, Result) :-
         Result = error(Errors)
     ).
 
-%% built-in functions (traps)
-builtin_env([
-    func(emit, [int], void),
-    func(key, [], int),
-    func(bye, [], void),
-    func('assert-fail', [], void)
-]).
+%% built-in functions (from gen/gen.pl trap_type)
+:- use_module('../gen/gen').
+
+builtin_env(Env) :-
+    findall(func(Name, Params, Ret),
+            gen:trap_type(Name, _, Params, Ret),
+            Env).
 
 %% ============================================================
 %% build function environment from definitions

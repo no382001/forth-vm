@@ -10,16 +10,26 @@ CXXFLAGS += -fsanitize=address -fno-omit-frame-pointer
 LDFLAGS += -fsanitize=address
 
 TARGET := vm
+CODEGEN := codegen
 BUILD_DIR := _build
+GEN_DIR := gen
 
-SRCS := $(wildcard src/*.cpp)
+SRCS := $(filter-out src/codegen.cpp, $(wildcard src/*.cpp))
 HDRS := $(wildcard src/*.h) $(wildcard src/*.hpp)
 OBJS := $(SRCS:src/%.cpp=$(BUILD_DIR)/%.o)
 
-all: $(TARGET)
+CODEGEN_OBJS := $(BUILD_DIR)/codegen.o $(BUILD_DIR)/vm.o
+
+all: $(TARGET) $(GEN_DIR)/gen.pl
 
 $(TARGET): $(OBJS)
 	$(CXX) $(LDFLAGS) $(OBJS) -o $@
+
+$(CODEGEN): $(CODEGEN_OBJS)
+	$(CXX) $(LDFLAGS) $(CODEGEN_OBJS) -o $@
+
+$(GEN_DIR)/gen.pl: $(CODEGEN) | $(GEN_DIR)
+	./$(CODEGEN) > $@
 
 $(BUILD_DIR)/%.o: src/%.cpp $(HDRS) | $(BUILD_DIR)
 	$(CXX) $(CXXFLAGS) -c $< -o $@
@@ -27,9 +37,12 @@ $(BUILD_DIR)/%.o: src/%.cpp $(HDRS) | $(BUILD_DIR)
 $(BUILD_DIR):
 	mkdir -p $@
 
+$(GEN_DIR):
+	mkdir -p $@
+
 .PHONY: clean
 clean:
-	rm -rf $(BUILD_DIR) $(TARGET)
+	rm -rf $(BUILD_DIR) $(GEN_DIR) $(TARGET) $(CODEGEN)
 
 .PHONY: format
 format:
