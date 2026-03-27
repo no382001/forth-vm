@@ -10,8 +10,8 @@ subst(something)
 label(end)
 lit 3
 lit 65
-trap 0
-trap 2" | ./assembler/ma.pl -i /dev/stdin -b | ./vm'
+lit 0 trap
+lit 2 trap" | ./assembler/ma.pl -i /dev/stdin -b | ./vm'
   [ "$status" -eq 0 ]
   [ "$output" = "A" ]
 }

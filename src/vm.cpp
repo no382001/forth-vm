@@ -129,7 +129,7 @@ inline auto h_execute(vm &v) -> void {
 }
 
 inline auto h_trap(vm &v) -> void {
-  auto n = fetch_cell(v);
+  auto n = pop(v);
   switch (n) {
   case TRAP_EMIT:
     std::putchar(static_cast<char>(pop(v)));
@@ -175,7 +175,7 @@ const std::array<op_info, OP_COUNT> dispatch = {{
     {CALL, "call", 0, 0, 0, 1, h_call},
     {RET, "ret", 0, 0, 1, 0, h_ret},
     {EXECUTE, "execute", 1, 0, 0, 1, h_execute},
-    {TRAP, "trap", 0, 0, 0, 0, h_trap}, // stack effect varies by trap
+    {TRAP, "trap", 1, 0, 0, 0, h_trap}, // pops trap number from stack
 }};
 
 auto step(vm &v) -> void {

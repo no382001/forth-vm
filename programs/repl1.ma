@@ -53,7 +53,7 @@ label(repl)
 label(readword)
 
 label(skipws)
-    trap 1                   \ ( c ) -- read char
+    lit 1 trap               \ ( c ) -- read char
     dup lit 32 =             \ is it space?
     zbranch(check_nl)
     drop branch(skipws)      \ skip space, continue
@@ -69,7 +69,7 @@ label(got_char)
 label(read_loop)
     swap over c!             \ ( addr ) -- store char at addr
     lit 1 +                  \ ( addr+1 ) -- advance pointer
-    trap 1                   \ ( addr+1 c ) -- read next char
+    lit 1 trap               \ ( addr+1 c ) -- read next char
     dup lit 32 =             \ is it space?
     zbranch(check_nl2)
     drop lit 0 swap c!       \ null-terminate and return
@@ -92,7 +92,7 @@ label(dispatch)
     \ bye
     lit subst(INBUF) addrofstr(s_bye) call(strcmp)
     zbranch(try_add)
-    trap 2
+    lit 2 trap
 
 label(try_add)
     \ +
@@ -107,7 +107,7 @@ label(try_dot)
     lit subst(INBUF) addrofstr(s_dot) call(strcmp)
     zbranch(try_num)
     call(upop) call(print_num)
-    lit 10 trap 0
+    lit 10 lit 0 trap
     ret
 
 label(try_num)
@@ -120,8 +120,8 @@ label(try_num)
 label(unknown)
     \ print `?`
     drop
-    lit 63 trap 0
-    lit 10 trap 0
+    lit 63 lit 0 trap
+    lit 10 lit 0 trap
     ret
 
 \ ============================================================
@@ -186,7 +186,7 @@ label(pnum_emit)
 label(pnum_emit_loop)
     r>                       \ pop digit (or sentinel)
     dup zbranch(pnum_done)   \ sentinel (0) means we're done
-    trap 0                   \ emit character
+    lit 0 trap               \ emit character
     branch(pnum_emit_loop)
 
 label(pnum_done)
@@ -194,7 +194,7 @@ label(pnum_done)
 
 label(print_zero)
     drop                     \ drop the 0 input
-    lit 48 trap 0            \ emit '0'
+    lit 48 lit 0 trap        \ emit '0'
     ret
 
 \ ============================================================

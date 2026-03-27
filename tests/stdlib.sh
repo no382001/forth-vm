@@ -14,10 +14,10 @@ addrofstr(a)
 addrofstr(b)
 call(strcmp)
 zbranch(fail)
-trap 2
+lit 2 trap
 
 label(fail)
-trap 3
+lit 3 trap
 EOF
 '
   [ "$status" -eq 0 ]
@@ -37,10 +37,10 @@ addrofstr(a)
 addrofstr(b)
 call(strcmp)
 zbranch(pass)
-trap 3
+lit 3 trap
 
 label(pass)
-trap 2
+lit 2 trap
 EOF
 '
   [ "$status" -eq 0 ]
@@ -60,10 +60,10 @@ addrofstr(a)
 addrofstr(b)
 call(strcmp)
 zbranch(pass)
-trap 3
+lit 3 trap
 
 label(pass)
-trap 2
+lit 2 trap
 EOF
 '
   [ "$status" -eq 0 ]
@@ -83,10 +83,10 @@ addrofstr(a)
 addrofstr(b)
 call(strcmp)
 zbranch(pass)
-trap 3
+lit 3 trap
 
 label(pass)
-trap 2
+lit 2 trap
 EOF
 '
   [ "$status" -eq 0 ]
@@ -106,10 +106,10 @@ addrofstr(a)
 addrofstr(b)
 call(strcmp)
 zbranch(fail)
-trap 2
+lit 2 trap
 
 label(fail)
-trap 3
+lit 3 trap
 EOF
 '
   [ "$status" -eq 0 ]
@@ -129,10 +129,10 @@ addrofstr(a)
 addrofstr(b)
 call(strcmp)
 zbranch(pass)
-trap 3
+lit 3 trap
 
 label(pass)
-trap 2
+lit 2 trap
 EOF
 '
   [ "$status" -eq 0 ]
@@ -152,10 +152,10 @@ addrofstr(a)
 addrofstr(b)
 call(strcmp)
 zbranch(fail)
-trap 2
+lit 2 trap
 
 label(fail)
-trap 3
+lit 3 trap
 EOF
 '
   [ "$status" -eq 0 ]
@@ -175,10 +175,10 @@ addrofstr(a)
 addrofstr(b)
 call(strcmp)
 zbranch(pass)
-trap 3
+lit 3 trap
 
 label(pass)
-trap 2
+lit 2 trap
 EOF
 '
   [ "$status" -eq 0 ]

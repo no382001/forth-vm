@@ -1,7 +1,7 @@
 \ this is a macro-assembled forth program
 
 label(loop)
-trap 1       \ key ( -- c )
-trap 0       \ emit ( c -- )
+lit 1 trap   \ key ( -- c )
+lit 0 trap   \ emit ( c -- )
 branch(loop)
-trap 2
+lit 2 trap

@@ -5,7 +5,7 @@ label(start)
     lit 128              \ buffer address
 
 label(readloop)
-    trap 1               \ ( addr -- addr c )
+    lit 1 trap            \ ( addr -- addr c )
     dup lit 10 =         \ is it newline?
     zbranch(store)
 
@@ -34,7 +34,7 @@ label(check)
     lit 131 c@ lit 0 =   \ [3] == null? (not "byeee")
     zbranch(notbye)
 
-trap 2               \ goodbye!
+lit 2 trap            \ goodbye!
 
 label(notbye)
     \ echo the buffer
@@ -43,11 +43,11 @@ label(notbye)
 label(echoloop)
     dup c@               \ ( addr -- addr c )
     dup zbranch(echodone) \ if null, we're done
-    trap 0               \ emit
+    lit 0 trap            \ emit
     lit 1 +              \ next addr
     branch(echoloop)
 
 label(echodone)
     drop drop            \ clean up stack
-    lit 10 trap 0        \ emit newline
+    lit 10 lit 0 trap     \ emit newline
     branch(start)
