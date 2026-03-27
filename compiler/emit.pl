@@ -1,9 +1,10 @@
 :- module(emit, [emit_binary/2]).
 
 :- use_module(library(lists)).
+:- use_module('../gen/gen').
 
 %% Cell size in bytes (matches VM)
-cell_size(2).
+cell_size(S) :- gen:cell_size(S).
 
 %% ============================================================
 %% entry
@@ -108,32 +109,7 @@ encode_cell(N, Value, [B | Bs]) :-
     encode_cell(N1, Value1, Bs).
 
 %% ============================================================
-%% opcode table (matches gen/gen.pl)
+%% opcode lookup (from gen/gen.pl)
 %% ============================================================
 
-opcode(nop, 0).
-opcode(lit, 1).
-opcode('@', 2).
-opcode('!', 3).
-opcode('c@', 4).
-opcode('c!', 5).
-opcode(drop, 6).
-opcode(dup, 7).
-opcode(swap, 8).
-opcode(over, 9).
-opcode('>r', 10).
-opcode('r>', 11).
-opcode('r@', 12).
-opcode('+', 13).
-opcode('-', 14).
-opcode('and', 15).
-opcode('or', 16).
-opcode('xor', 17).
-opcode('=', 18).
-opcode('<', 19).
-opcode(branch, 20).
-opcode('0branch', 21).
-opcode(call, 22).
-opcode(ret, 23).
-opcode(execute, 24).
-opcode(trap, 25).
+opcode(Name, Op) :- gen:op(Name, Op, _, _, _, _).
