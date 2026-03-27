@@ -61,6 +61,13 @@ transform(list([sym(do) | Forms]),
           do(Exprs)) :-
     maplist(transform, Forms, Exprs).
 
+%% (addr name) — address of a function
+transform(list([sym(addr), sym(Name)]), addr(Name)).
+
+%% (execute expr) — indirect call via address
+transform(list([sym(execute), E]), execute(TE)) :-
+    transform(E, TE).
+
 %% (deref expr)
 transform(list([sym(deref), E]), deref(TE)) :-
     transform(E, TE).
@@ -122,3 +129,5 @@ binop('!='). binop('<='). binop('>=').
 reserved(def). reserved(let). reserved(if). reserved(do).
 reserved(while). reserved(const). reserved(extern).
 reserved(deref). reserved(store). reserved(store8).
+reserved(addr). reserved(execute). reserved(deref8).
+reserved(include).

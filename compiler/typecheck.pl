@@ -176,6 +176,15 @@ infer(Env, FEnv, store8(Addr, Val), void) :-
     infer(Env, FEnv, Val, VT),
     numeric_type(VT).
 
+%% addr: get function address -> int
+infer(_, FEnv, addr(Name), int) :-
+    member(func(Name, _, _), FEnv).
+
+%% execute: indirect call -> void
+infer(Env, FEnv, execute(E), void) :-
+    infer(Env, FEnv, E, ET),
+    numeric_type(ET).
+
 %% function call
 infer(Env, FEnv, call(Name, Args), RetType) :-
     member(func(Name, ParamTypes, RetType), FEnv),

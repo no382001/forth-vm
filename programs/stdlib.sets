@@ -1,0 +1,48 @@
+;; ---- VM registers (memory-mapped) ----
+(const VM_SP  int ($vm-sp))
+(const VM_RP  int ($vm-rp))
+(const VM_IP  int ($vm-ip))
+
+;; ---- catch frame stack ----
+;; Each frame: saved_RP (2 bytes) + saved_DSP (2 bytes) = 4 bytes
+;; 8 frames max = 32 bytes
+($alloc THROWN  2)    ; error code from throw (0 = none)
+($alloc CF_SP   2)    ; catch frame stack pointer (byte offset)
+($alloc CF_BASE 32)   ; catch frame stack (8 frames)
+
+(def catch_init () : void
+  (store CF_SP 0)
+  (store THROWN 0))
+
+;; push a catch frame — saves VM RP and Forth DSP
+;; We save RP-1 (skipping catch_push's own return addr slot) so that
+;; when throw restores RP and RETs, it pops the *caller's* return addr,
+;; effectively returning from the function that called catch_push.
+(def catch_push () : void
+  (let ((off (deref CF_SP)))
+    (store (+ CF_BASE off) (- (deref VM_RP) 1))
+    (store (+ CF_BASE (+ off 2)) (deref DSP))
+    (store CF_SP (+ off 4))))
+
+;; pop a catch frame (normal return path)
+(def catch_pop () : void
+  (store CF_SP (- (deref CF_SP) 4)))
+
+;; throw — restore state to most recent catch frame and unwind
+;; ( error-code -- )
+(def f_throw () : void
+  (let ((code (ds_pop)))
+    (if (= (deref CF_SP) 0)
+      ;; no catch frame: print error and abort
+      (do (print_str "uncaught throw: ")
+          (print_num code)
+          (emit 10)
+          (bye))
+      ;; restore to catch frame
+      (let ((off (- (deref CF_SP) 4)))
+        (store THROWN code)
+        (store CF_SP off)
+        (store DSP (deref (+ CF_BASE (+ off 2))))
+        (store VM_RP (deref (+ CF_BASE off)))))))
+        ;; current function's RET will pop from restored RP
+        ;; -> lands back in the caller that set up the catch

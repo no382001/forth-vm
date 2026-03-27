@@ -1,45 +1,58 @@
 ;; ---- scratch cells ----
-(const STRI   int 32768)
-(const PRINTI int 32770)
-(const NAMEI  int 32772)
-(const WALKER int 32774)
-(const FOUND  int 32776)
-(const ITER   int 32778)
-(const CHAR   int 32780)
+($section 32768)
+($alloc STRI   2)
+($alloc PRINTI 2)
+($alloc NAMEI  2)
+($alloc WALKER 2)
+($alloc FOUND  2)
+($alloc ITER   2)
+($alloc CHAR   2)
 
 ;; ---- mul/divmod scratch ----
-(const REM    int 32782)
-(const DENOM  int 32784)
-(const SIGN   int 32786)
-(const QUOT   int 32788)
+($alloc REM    2)
+($alloc DENOM  2)
+($alloc SIGN   2)
+($alloc QUOT   2)
 
 ;; ---- print_num scratch ----
-(const PN_VAL  int 32790)
-(const PN_IDX  int 32792)
-(const PN_BUF  int 32794)  ; digit buffer (12 bytes)
+($alloc PN_VAL 2)
+($alloc PN_IDX 2)
+($alloc PN_BUF 12)   ; digit buffer
 
 ;; ---- parse_num scratch ----
-(const PN_POS  int 32810)
-(const PN_SIGN int 32812)
-(const PN_ACC  int 32814)
-(const PN_OK   int 32816)
+($alloc PN_POS  2)
+($alloc PN_SIGN 2)
+($alloc PN_ACC  2)
+($alloc PN_OK   2)
 
 ;; ---- dictionary / interpreter state ----
-(const LATEST int 32820)
-(const HERE   int 32822)
-(const STATE  int 32824)   ; 0 = interpret (unused for now)
+($alloc LATEST 2)
+($alloc HERE   2)
+($alloc STATE  2)    ; 0 = interpret, 1 = compile
+($alloc DSP    2)    ; data stack pointer (cell addr)
+($alloc LPOS   2)    ; tokenizer position in LBUF
+
+;; ---- colon definition state ----
+($alloc CSTART 2)    ; code start address for current : definition
+
+;; ---- included stdlib (catch/throw) ----
+;; stdlib uses $alloc for CF_SP, THROWN, CF_BASE (32 bytes)
+(include "stdlib.sets")
 
 ;; ---- I/O buffers ----
-(const LBUF int 33000)     ; line buffer
-(const WBUF int 33500)     ; word token buffer
+($section 33000)
+($alloc LBUF 256)     ; line buffer
+($alloc WBUF 256)     ; word token buffer
+($alloc CNAME 256)    ; colon def name buffer
 
 ;; ---- Forth data stack ----
 ;; stack grows upward: DSP points to next free slot
-(const DSB  int 34000)     ; data stack base
-(const DSP  int 32826)     ; data stack pointer (cell addr)
+($section 34000)
+($alloc DSB 512)      ; data stack base (256 cells)
 
 ;; ---- heap ----
-(const HEAP int 35000)
+($section 35000)
+($alloc HEAP 0)       ; heap starts here, grows upward
 
 ;; ============================================================
 ;; arithmetic helpers (no hw multiply/divide)
@@ -199,9 +212,6 @@
 ;; tokenizer — walk LBUF extracting space-delimited words
 ;; ============================================================
 
-;; LPOS tracks current position in LBUF
-(const LPOS int 32828)
-
 (def tok_init () : void
   (store LPOS 0))
 
@@ -255,88 +265,144 @@
         (< 1 0)))))
 
 ;; ============================================================
-;; dispatch — execute Forth primitives by xt
+;; Forth primitives — each is a plain function
 ;; ============================================================
 
-;; xt assignments:
-;;   1  = bye        10 = over      19 = .s
-;;   2  = .          11 = =         20 = cr
-;;   3  = +          12 = <         21 = emit
-;;   4  = -          13 = >         22 = and
-;;   5  = *          14 = 0=        23 = or
-;;   6  = /          15 = negate    24 = xor
-;;   7  = dup        16 = abs       25 = mod
-;;   8  = swap       17 = words
-;;   9  = drop       18 = max
+;; emit a cell to HERE, advance HERE by 2
+(def emit_cell ((v : int)) : void
+  (store (deref HERE) v)
+  (store HERE (+ (deref HERE) 2)))
 
-(def dispatch ((xt : int)) : void
-  (if (= xt 1) (bye)
-  (if (= xt 2)  ;; .  ( n -- ) print top
-    (do (print_num (ds_pop)) (emit 32))
-  (if (= xt 3)  ;; +
-    (let ((b (ds_pop))) (ds_push (+ (ds_pop) b)))
-  (if (= xt 4)  ;; -
-    (let ((b (ds_pop))) (ds_push (- (ds_pop) b)))
-  (if (= xt 5)  ;; *
-    (let ((b (ds_pop))) (ds_push (mul (ds_pop) b)))
-  (if (= xt 6)  ;; /
-    (let ((b (ds_pop))) (ds_push (divmod (ds_pop) b)))
-  (if (= xt 7)  ;; dup
-    (let ((a (ds_pop))) (do (ds_push a) (ds_push a)))
-  (if (= xt 8)  ;; swap
-    (let ((b (ds_pop))) (let ((a (ds_pop))) (do (ds_push b) (ds_push a))))
-  (if (= xt 9)  ;; drop
-    (do (ds_pop) (store ITER 0))
-  (if (= xt 10) ;; over
-    (let ((b (ds_pop))) (let ((a (ds_pop))) (do (ds_push a) (ds_push b) (ds_push a))))
-  (if (= xt 11) ;; =
-    (let ((b (ds_pop))) (if (= (ds_pop) b) (ds_push -1) (ds_push 0)))
-  (if (= xt 12) ;; <
-    (let ((b (ds_pop))) (if (< (ds_pop) b) (ds_push -1) (ds_push 0)))
-  (if (= xt 13) ;; >
-    (let ((b (ds_pop))) (if (< b (ds_pop)) (ds_push -1) (ds_push 0)))
-  (if (= xt 14) ;; 0=
-    (if (= (ds_pop) 0) (ds_push -1) (ds_push 0))
-  (if (= xt 15) ;; negate
-    (ds_push (- 0 (ds_pop)))
-  (if (= xt 16) ;; abs
-    (let ((a (ds_pop))) (if (< a 0) (ds_push (- 0 a)) (ds_push a)))
-  (if (= xt 17) ;; words
-    (dict_words)
-  (if (= xt 18) ;; max
-    (let ((b (ds_pop))) (let ((a (ds_pop))) (if (< a b) (ds_push b) (ds_push a))))
-  (if (= xt 19) ;; .s
-    (ds_show)
-  (if (= xt 20) ;; cr
-    (emit 10)
-  (if (= xt 21) ;; emit  ( n -- )
-    (emit (ds_pop))
-  (if (= xt 22) ;; and
-    (let ((b (ds_pop))) (ds_push (and (ds_pop) b)))
-  (if (= xt 23) ;; or
-    (let ((b (ds_pop))) (ds_push (or (ds_pop) b)))
-  (if (= xt 24) ;; xor
-    (let ((b (ds_pop))) (ds_push (xor (ds_pop) b)))
-  (if (= xt 25) ;; mod  ( a b -- a%b )
-    (let ((b (ds_pop)))
-      (let ((a (ds_pop)))
-        (do (divmod a b) (ds_push (deref REM)))))
-    (store ITER 0)))))))))))))))))))))))))))
+;; copy WBUF to CNAME
+(def save_name () : void
+  (store STRI 0)
+  (while (!= (deref8 (+ WBUF (deref STRI))) 0)
+    (store8 (+ CNAME (deref STRI)) (deref8 (+ WBUF (deref STRI))))
+    (store STRI (+ (deref STRI) 1)))
+  (store8 (+ CNAME (deref STRI)) 0))
+
+;; : — start a colon definition
+(def f_colon () : void
+  (tok_next)        ; read name token
+  (save_name)       ; save it
+  (store CSTART (deref HERE))  ; mark code start
+  (store STATE 1))  ; enter compile mode
+
+;; ; — end a colon definition (immediate)
+(def f_semi () : void
+  (emit_cell 23)    ; emit RET opcode
+  (dict_add CNAME (deref CSTART))
+  (store STATE 0))  ; back to interpret mode
+
+(def f_dot () : void
+  (print_num (ds_pop)) (emit 32))
+
+(def f_add () : void
+  (let ((b (ds_pop))) (ds_push (+ (ds_pop) b))))
+
+(def f_sub () : void
+  (let ((b (ds_pop))) (ds_push (- (ds_pop) b))))
+
+(def f_mul () : void
+  (let ((b (ds_pop))) (ds_push (mul (ds_pop) b))))
+
+(def f_div () : void
+  (let ((b (ds_pop))) (ds_push (divmod (ds_pop) b))))
+
+(def f_mod () : void
+  (let ((b (ds_pop)))
+    (let ((a (ds_pop)))
+      (divmod a b) (ds_push (deref REM)))))
+
+(def f_dup () : void
+  (let ((a (ds_pop))) (ds_push a) (ds_push a)))
+
+(def f_swap () : void
+  (let ((b (ds_pop))) (let ((a (ds_pop))) (ds_push b) (ds_push a))))
+
+(def f_drop () : void
+  (ds_pop) (store ITER 0))
+
+(def f_over () : void
+  (let ((b (ds_pop))) (let ((a (ds_pop))) (ds_push a) (ds_push b) (ds_push a))))
+
+(def f_eq () : void
+  (let ((b (ds_pop))) (if (= (ds_pop) b) (ds_push -1) (ds_push 0))))
+
+(def f_lt () : void
+  (let ((b (ds_pop))) (if (< (ds_pop) b) (ds_push -1) (ds_push 0))))
+
+(def f_gt () : void
+  (let ((b (ds_pop))) (if (< b (ds_pop)) (ds_push -1) (ds_push 0))))
+
+(def f_zeq () : void
+  (if (= (ds_pop) 0) (ds_push -1) (ds_push 0)))
+
+(def f_negate () : void
+  (ds_push (- 0 (ds_pop))))
+
+(def f_abs () : void
+  (let ((a (ds_pop))) (if (< a 0) (ds_push (- 0 a)) (ds_push a))))
+
+(def f_max () : void
+  (let ((b (ds_pop))) (let ((a (ds_pop))) (if (< a b) (ds_push b) (ds_push a)))))
+
+(def f_dot_s () : void
+  (ds_show))
+
+(def f_cr () : void
+  (emit 10))
+
+(def f_emit () : void
+  (emit (ds_pop)))
+
+(def f_and () : void
+  (let ((b (ds_pop))) (ds_push (and (ds_pop) b))))
+
+(def f_or () : void
+  (let ((b (ds_pop))) (ds_push (or (ds_pop) b))))
+
+(def f_xor () : void
+  (let ((b (ds_pop))) (ds_push (xor (ds_pop) b))))
+
+(def f_words () : void
+  (dict_words))
+
+(def f_bye () : void
+  (bye))
 
 ;; ============================================================
 ;; interpret one word (in WBUF)
 ;; ============================================================
 
 (def interpret_word () : void
-  (let ((xt (dict_find WBUF)))
-    (if (!= xt 0)
-      (dispatch xt)
-      ;; not a word — try as a number
-      (if (parse_num)
-        (ds_push (deref PN_ACC))
-        (do (print_str WBUF)
-            (print_str " ?")
-            (emit 10))))))
+  (if (= (deref STATE) 0)
+    ;; --- interpret mode ---
+    (let ((xt (dict_find WBUF)))
+      (if (!= xt 0)
+        (execute xt)
+        (if (parse_num)
+          (ds_push (deref PN_ACC))
+          (do (print_str WBUF) (print_str " ?") (emit 10)))))
+    ;; --- compile mode ---
+    (if (streq WBUF ";")
+      (f_semi)
+      (let ((xt (dict_find WBUF)))
+        (if (!= xt 0)
+          (do (emit_cell 22) (emit_cell xt))
+          (if (parse_num)
+            (do (emit_cell 1) (emit_cell (deref PN_ACC))
+                (emit_cell 22) (emit_cell (addr ds_push)))
+            (do (print_str WBUF) (print_str " ?") (emit 10))))))))
+
+;; run all tokens on a line, wrapped in catch
+;; catch_push saves RP here; if throw fires, we return from run_line early
+(def run_line () : void
+  (catch_push)
+  (tok_init)
+  (while (< 0 (tok_next))
+    (interpret_word))
+  (catch_pop))
 
 ;; ============================================================
 ;; main
@@ -345,33 +411,37 @@
 (def main () : void
   (dict_init)
   (ds_init)
+  (catch_init)
 
-  ;; populate dictionary
-  (dict_add "bye" 1)
-  (dict_add "." 2)
-  (dict_add "+" 3)
-  (dict_add "-" 4)
-  (dict_add "*" 5)
-  (dict_add "/" 6)
-  (dict_add "dup" 7)
-  (dict_add "swap" 8)
-  (dict_add "drop" 9)
-  (dict_add "over" 10)
-  (dict_add "=" 11)
-  (dict_add "<" 12)
-  (dict_add ">" 13)
-  (dict_add "0=" 14)
-  (dict_add "negate" 15)
-  (dict_add "abs" 16)
-  (dict_add "words" 17)
-  (dict_add "max" 18)
-  (dict_add ".s" 19)
-  (dict_add "cr" 20)
-  (dict_add "emit" 21)
-  (dict_add "and" 22)
-  (dict_add "or" 23)
-  (dict_add "xor" 24)
-  (dict_add "mod" 25)
+  ;; populate dictionary — xt is the real code address
+  (dict_add "bye"    (addr f_bye))
+  (dict_add "."      (addr f_dot))
+  (dict_add "+"      (addr f_add))
+  (dict_add "-"      (addr f_sub))
+  (dict_add "*"      (addr f_mul))
+  (dict_add "/"      (addr f_div))
+  (dict_add "dup"    (addr f_dup))
+  (dict_add "swap"   (addr f_swap))
+  (dict_add "drop"   (addr f_drop))
+  (dict_add "over"   (addr f_over))
+  (dict_add "="      (addr f_eq))
+  (dict_add "<"      (addr f_lt))
+  (dict_add ">"      (addr f_gt))
+  (dict_add "0="     (addr f_zeq))
+  (dict_add "negate" (addr f_negate))
+  (dict_add "abs"    (addr f_abs))
+  (dict_add "words"  (addr f_words))
+  (dict_add "max"    (addr f_max))
+  (dict_add ".s"     (addr f_dot_s))
+  (dict_add "cr"     (addr f_cr))
+  (dict_add "emit"   (addr f_emit))
+  (dict_add "and"    (addr f_and))
+  (dict_add "or"     (addr f_or))
+  (dict_add "xor"    (addr f_xor))
+  (dict_add "mod"    (addr f_mod))
+  (dict_add "throw"  (addr f_throw))
+
+  (dict_add ":"      (addr f_colon))
 
   
   (print_str "sets forth")
@@ -383,9 +453,11 @@
       (if (= len -1) (bye)
         (if (< 0 len)
           (do
-            (tok_init)
-            (while (< 0 (tok_next))
-              (interpret_word))
-            (print_str " ok")
-            (emit 10))
+            (store THROWN 0)
+            (run_line)
+            (if (= (deref THROWN) 0)
+              (do (print_str " ok") (emit 10))
+              (do (print_str "error: ")
+                  (print_num (deref THROWN))
+                  (emit 10))))
           (store ITER 0))))))

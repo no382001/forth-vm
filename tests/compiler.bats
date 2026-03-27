@@ -217,3 +217,46 @@ setup() {
   run run_program_file "$BATS_TEST_DIRNAME/../programs/forth.sets" $'foo\nbye\n'
   [[ "$output" == *"foo ?"* ]]
 }
+
+@test "e2e: forth colon def simple" {
+  run run_program_file "$BATS_TEST_DIRNAME/../programs/forth.sets" $': test 42 ;\ntest .\nbye\n'
+  [[ "$output" == *"42 "* ]]
+}
+
+@test "e2e: forth colon def using builtins" {
+  run run_program_file "$BATS_TEST_DIRNAME/../programs/forth.sets" $': square dup * ;\n5 square .\nbye\n'
+  [[ "$output" == *"25 "* ]]
+}
+
+@test "e2e: forth colon def calling colon def" {
+  run run_program_file "$BATS_TEST_DIRNAME/../programs/forth.sets" $': square dup * ;\n: quad square square ;\n3 quad .\nbye\n'
+  [[ "$output" == *"81 "* ]]
+}
+
+@test "e2e: forth colon def with literal and op" {
+  run run_program_file "$BATS_TEST_DIRNAME/../programs/forth.sets" $': double 2 * ;\n7 double .\nbye\n'
+  [[ "$output" == *"14 "* ]]
+}
+
+@test "e2e: forth throw and recover" {
+  run run_program_file "$BATS_TEST_DIRNAME/../programs/forth.sets" $'99 throw\n3 4 + .\nbye\n'
+  [[ "$output" == *"error: 99"* ]]
+  [[ "$output" == *"7 "* ]]
+}
+
+@test "e2e: forth throw from colon def" {
+  run run_program_file "$BATS_TEST_DIRNAME/../programs/forth.sets" $': boom 42 throw ;\nboom\n10 .\nbye\n'
+  [[ "$output" == *"error: 42"* ]]
+  [[ "$output" == *"10 "* ]]
+}
+
+@test "e2e: meta alloc and vm-sp" {
+  prog='($section 1000)
+($alloc X 2)
+(def main () : void
+  (store X ($vm-sp))
+  (if (!= (deref X) 0) (emit 89) (emit 78))
+  (bye))'
+  run run_program "$prog"
+  [ "$output" = "Y" ]
+}

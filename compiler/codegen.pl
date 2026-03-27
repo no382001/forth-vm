@@ -96,6 +96,7 @@ compile_body([E | Rest], Env, Consts, LN0, Code, LN) :-
 void_expr(store(_, _)).
 void_expr(store8(_, _)).
 void_expr(while(_, _)).
+void_expr(execute(_)).
 void_expr(call(Name, _)) :- builtin_trap(Name, void, _).
 void_expr(call(Name, _)) :- user_void_func(Name).
 void_expr(let(_, Body)) :- last_void(Body).
@@ -195,6 +196,14 @@ compile_expr(store8(Addr, Val), Env, Consts, LN0, Code, LN) :-
     compile_expr(Addr, Env, Consts, LN1, AC, LN),
     append(VC, AC, C1),
     append(C1, [op('c!')], Code).
+
+%% addr — push function address
+compile_expr(addr(Name), _, _, LN, [lit_label(Name)], LN).
+
+%% execute — indirect call via address on stack
+compile_expr(execute(E), Env, Consts, LN0, Code, LN) :-
+    compile_expr(E, Env, Consts, LN0, EC, LN),
+    append(EC, [op(execute)], Code).
 
 %% function call
 compile_expr(call(Name, Args), Env, Consts, LN0, Code, LN) :-
