@@ -223,3 +223,80 @@ types_compatible(byte, int) :- !.
 
 numeric_type(int).
 numeric_type(byte).
+
+%% ============================================================
+%% test helper: parse -> ast -> typecheck pipeline
+%% ============================================================
+
+:- use_module(parser).
+:- use_module(ast).
+
+pipeline(Src, Result) :-
+    parse(Src, ParseResult),
+    ( ParseResult = ok(Forms) ->
+        transform_program(Forms, AstResult),
+        ( AstResult = ok(Defs) ->
+            check_program(Defs, Result)
+        ;
+            Result = AstResult
+        )
+    ;
+        Result = ParseResult
+    ).
+
+%% ============================================================
+%% tests
+%% ============================================================
+
+%% basic function typing
+?- pipeline("(def id ((x : int)) : int x)", ok(_)).
+   true.
+
+?- pipeline("(def add ((a : int) (b : int)) : int (+ a b))", ok(_)).
+   true.
+
+?- pipeline("(def lt ((a : int) (b : int)) : bool (< a b))", ok(_)).
+   true.
+
+?- pipeline("(def abs ((n : int)) : int (if (< n 0) (- 0 n) n))", ok(_)).
+   true.
+
+%% type errors
+?- pipeline("(def bad ((n : int)) : bool n)", error(_)).
+   true.
+
+?- pipeline("(def bad ((n : int)) : int (if (< n 0) 1 (< n 5)))", error(_)).
+   true.
+
+?- pipeline("(def bad () : int x)", error(_)).
+   true.
+
+?- pipeline("(def f ((x : int)) : int x) (def g () : int (f 1 2))", error(_)).
+   true.
+
+%% let bindings
+?- pipeline("(def f ((x : int)) : int (let ((y (+ x 1))) y))", ok(_)).
+   true.
+
+%% pointers
+?- pipeline("(def f ((p : (ptr int))) : int (deref p))", ok(_)).
+   true.
+
+?- pipeline("(def f ((p : (ptr int)) (v : int)) : void (store p v))", ok(_)).
+   true.
+
+%% extern
+?- pipeline("(extern emit (int) : void) (def f () : void (emit 65))", ok(_)).
+   true.
+
+%% const
+?- pipeline("(const BUFSIZE int 256) (def f () : int BUFSIZE)", ok(_)).
+   true.
+
+%% while
+?- pipeline("(def f ((n : int)) : void (while (< n 10) (+ n 1)))", ok(_)).
+   true.
+
+%% multi-expr body
+?- pipeline("(extern emit (int) : void) (def f ((n : int)) : int (emit n) (+ n 1))", ok(_)).
+   true.

@@ -84,3 +84,56 @@ ws_char('\r').
 skip_to_newline --> "\n", !.
 skip_to_newline --> [_], !, skip_to_newline.
 skip_to_newline --> [].
+
+%% ============================================================
+%% tests
+%% ============================================================
+
+%% atoms
+?- parse("hello", R).
+   R = ok([sym(hello)]).
+
+?- parse("+", R).
+   R = ok([sym(+)]).
+
+?- parse("foo bar", R).
+   R = ok([sym(foo), sym(bar)]).
+
+%% numbers
+?- parse("42", R).
+   R = ok([num(42)]).
+
+?- parse("-7", R).
+   R = ok([num(-7)]).
+
+?- parse("0", R).
+   R = ok([num(0)]).
+
+%% lists
+?- parse("()", R).
+   R = ok([list([])]).
+
+?- parse("(+ 1 2)", R).
+   R = ok([list([sym(+), num(1), num(2)])]).
+
+?- parse("(if (< x 0) 1 2)", R).
+   R = ok([list([sym(if), list([sym(<), sym(x), num(0)]), num(1), num(2)])]).
+
+%% strings
+?- parse("\"hello\"", R).
+   R = ok([str("hello")]).
+
+%% whitespace / comments
+?- parse("  1   2  ", R).
+   R = ok([num(1), num(2)]).
+
+?- parse("; this is a comment\n42", R).
+   R = ok([num(42)]).
+
+%% function def
+?- parse("(def square (x) : int (* x x))", R).
+   R = ok([list([sym(def), sym(square), list([sym(x)]), sym(:), sym(int), list([sym(*), sym(x), sym(x)])])]).
+
+%% empty
+?- parse("", R).
+   R = ok([]).

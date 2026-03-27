@@ -222,3 +222,33 @@ builtin_trap(emit, void, [lit(0), op(trap)]).
 builtin_trap(key, int, [lit(1), op(trap)]).
 builtin_trap(bye, void, [lit(2), op(trap)]).
 builtin_trap('assert-fail', void, [lit(3), op(trap)]).
+
+%% ============================================================
+%% tests
+%% ============================================================
+
+:- use_module(parser).
+:- use_module(ast).
+:- use_module(typecheck).
+
+codegen_pipeline(Src, Result) :-
+    parse(Src, ok(Forms)),
+    transform_program(Forms, ok(Defs)),
+    check_program(Defs, ok(_)),
+    compile_program(Defs, Result).
+
+?- codegen_pipeline("(def main () : void (emit 65) (bye))", ok(_)).
+   true.
+
+?- codegen_pipeline("(def main () : void (emit (+ 60 5)) (bye))", ok(_)).
+   true.
+
+?- codegen_pipeline("(def main () : void (emit (if (< 1 2) 65 66)) (bye))", ok(_)).
+   true.
+
+?- codegen_pipeline("(def main () : void (let ((x 65)) (emit x)) (bye))", ok(_)).
+   true.
+
+?- codegen_pipeline("(def add1 ((n : int)) : int (+ n 1)) (def main () : void (emit (add1 64)) (bye))", ok(Tokens)),
+   member(label(main), Tokens), member(label(add1), Tokens).
+   true.
