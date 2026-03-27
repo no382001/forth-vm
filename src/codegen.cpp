@@ -8,8 +8,8 @@ auto main() -> int {
   // opcodes
   std::printf("%% op(Name, Opcode, StackIn, StackOut, RStackIn, RStackOut).\n");
   for (const auto &info : dispatch) {
-    std::printf("op('%s', %d, %d, %d, %d, %d).\n", info.name.data(),
-                info.code, info.in, info.out, info.rin, info.rout);
+    std::printf("op('%s', %d, %d, %d, %d, %d).\n", info.name.data(), info.code,
+                info.in, info.out, info.rin, info.rout);
   }
 
   // catch-all for numeric literals
