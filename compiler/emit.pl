@@ -33,6 +33,7 @@ token_size(lit(_), S)     :- gen:cell_size(C), S is C * 2.     % opcode + value
 token_size(call(_), S)    :- gen:cell_size(C), S is C * 2.     % opcode + addr
 token_size(branch(_), S)  :- gen:cell_size(C), S is C * 2.     % opcode + addr
 token_size(zbranch(_), S) :- gen:cell_size(C), S is C * 2.     % opcode + addr
+token_size(lit_label(_), S) :- gen:cell_size(C), S is C * 2. % opcode + addr
 token_size(byte(_), 1).
 token_size(label(_), 0).
 
@@ -84,6 +85,15 @@ encode_token(branch(Label), Labels, Bytes) :-
 %% zbranch label
 encode_token(zbranch(Label), Labels, Bytes) :-
     opcode('0branch', Op),
+    member(Label-Addr, Labels),
+    gen:cell_size(CS),
+    encode_cell(CS, Op, OpBytes),
+    encode_cell(CS, Addr, AddrBytes),
+    append(OpBytes, AddrBytes, Bytes).
+
+%% lit_label: push a label's address as a literal
+encode_token(lit_label(Label), Labels, Bytes) :-
+    opcode(lit, Op),
     member(Label-Addr, Labels),
     gen:cell_size(CS),
     encode_cell(CS, Op, OpBytes),

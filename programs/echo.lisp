@@ -9,6 +9,18 @@
 (const I   int 1026)
 (const C   int 1024)
 
+;; compare two null-terminated byte strings
+;; uses J (1022) as loop counter to avoid clobbering I
+(const J int 1022)
+
+(def streq ((a : int) (b : int)) : bool
+  (store J 0)
+  (while (if (= (deref8 (+ a (deref J))) (deref8 (+ b (deref J))))
+           (!= (deref8 (+ a (deref J))) 0)
+           (< 1 0))
+    (store J (+ (deref J) 1)))
+  (= (deref8 (+ a (deref J))) (deref8 (+ b (deref J)))))
+
 (def main () : void
   (while (< 0 1)
     ;; read a line into BUF
@@ -21,13 +33,7 @@
     (store8 (+ BUF (deref I)) 0)
 
     ;; if line is "bye", exit
-    (if (if (= (deref8 BUF) 98)
-          (if (= (deref8 (+ BUF 1)) 121)
-            (if (= (deref8 (+ BUF 2)) 101)
-              (= (deref I) 3)
-              (< 1 0))
-            (< 1 0))
-          (< 1 0))
+    (if (streq BUF "bye")
       (bye)
       ;; otherwise echo the line back
       (do (store I 0)

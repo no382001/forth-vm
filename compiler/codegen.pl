@@ -8,7 +8,7 @@
 
 compile_program(Defs, ok(Code)) :-
     collect_consts(Defs, Consts),
-    compile_defs(Defs, Consts, 0, 256, Code).
+    compile_defs(Defs, Consts, 0, 512, Code).
 
 %% ============================================================
 %% collect top-level constants for inlining
@@ -86,6 +86,16 @@ void_expr(call(Name, _)) :- builtin_trap(Name, void, _).
 
 %% literal
 compile_expr(num(N), _, _, LN, [lit(N)], LN).
+
+%% string literal: branch over inline data, push address
+compile_expr(str(Chars), _, _, LN0, Code, LN) :-
+    genlabel(LN0, "_sdata_", DataL, LN1),
+    genlabel(LN1, "_send_", EndL, LN2),
+    LN = LN2,
+    chars_to_bytes(Chars, DataBytes),
+    append(DataBytes, [byte(0)], DataWithNull),
+    append([branch(EndL), label(DataL) | DataWithNull],
+           [label(EndL), lit_label(DataL)], Code).
 
 %% variable: load from memory slot
 compile_expr(var(Name), Env, Consts, LN, Code, LN) :-
@@ -192,10 +202,15 @@ compile_let([bind(Name, Expr) | Rest], Env, Consts, LN0, Code, ExtEnv, LN) :-
     append(ExprCode, StoreCode, BindCode),
     append(BindCode, RestCode, Code).
 
-max_addr([], 254).  % base - 2, so first alloc = 256
+max_addr([], 510).  % base - 2, so first alloc = 512
 max_addr([var(_, A) | Rest], Max) :-
     max_addr(Rest, RestMax),
     ( A > RestMax -> Max = A ; Max = RestMax ).
+
+chars_to_bytes([], []).
+chars_to_bytes([C|Cs], [byte(B)|Bs]) :-
+    char_code(C, B),
+    chars_to_bytes(Cs, Bs).
 
 genlabel(N, Prefix, Label, N1) :-
     N1 is N + 1,

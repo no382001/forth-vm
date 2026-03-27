@@ -228,6 +228,8 @@ check_args([A | As], [T | Ts], Env, FEnv) :-
 types_compatible(T, T) :- !.
 types_compatible(int, byte) :- !.
 types_compatible(byte, int) :- !.
+types_compatible(int, ptr(_)) :- !.
+types_compatible(ptr(_), int) :- !.
 
 numeric_type(int).
 numeric_type(byte).

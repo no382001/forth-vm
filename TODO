@@ -1,3 +1,2 @@
-fix the atrocities committed in prolog
-
--> this is all leading up to implementing the dictionary
+- store and store8 should be c@ and c! to avoid confusion
+- with that step i should also reduce the mapping overhead, it should be 1:1
