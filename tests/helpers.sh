@@ -42,3 +42,20 @@ run_program() {
   printf '%s' "$input" | "$FORTH_ROOT/vm" "$binfile"
   rm -f "$srcfile" "$binfile"
 }
+
+# run_program_file <lisp_file> [stdin_input]
+# Compile a .lisp file to binary, run it on the VM with optional input.
+run_program_file() {
+  local srcfile="$1" input="${2:-}"
+  local binfile
+  binfile="$(mktemp /tmp/forth-XXXXXX.bin)"
+  (
+    cd "$COMPILER_DIR"
+    $PROLOG -g "
+      use_module(compiler),
+      compile_file('$srcfile', '$binfile'), halt.
+    " < /dev/null 2>/dev/null
+  )
+  printf '%s' "$input" | "$FORTH_ROOT/vm" "$binfile"
+  rm -f "$binfile"
+}

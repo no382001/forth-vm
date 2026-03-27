@@ -93,6 +93,21 @@ setup() {
   [[ "$result" == ok* ]]
 }
 
+@test "typecheck: ptr arithmetic" {
+  result="$(compile '(def f ((p : (ptr byte))) : (ptr byte) (+ p 1))' typed)"
+  [[ "$result" == ok* ]]
+}
+
+@test "typecheck: ptr comparison" {
+  result="$(compile '(def f ((a : (ptr byte)) (b : (ptr byte))) : bool (= a b))' typed)"
+  [[ "$result" == ok* ]]
+}
+
+@test "typecheck: string arg to ptr(byte) param" {
+  result="$(compile '(def f ((s : (ptr byte))) : byte (deref8 s)) (def main () : void (f "hi") (bye))' typed)"
+  [[ "$result" == ok* ]]
+}
+
 # ============================================================
 # typecheck: should reject
 # ============================================================
@@ -161,4 +176,24 @@ setup() {
     '(const BUF int 1028) (const I int 1026) (const C int 1024) (def main () : void (store I 0) (while (do (store C (key)) (!= (deref C) 10)) (store8 (+ BUF (deref I)) (deref C)) (store I (+ (deref I) 1))) (store8 (+ BUF (deref I)) 0) (store I 0) (while (!= (deref8 (+ BUF (deref I))) 0) (emit (deref8 (+ BUF (deref I)))) (store I (+ (deref I) 1))) (bye))' \
     $'hello\n'
   [ "$output" = "hello" ]
+}
+
+@test "e2e: user void function no spurious drop" {
+  run run_program '(def greet () : void (emit 72) (emit 105)) (def main () : void (greet) (emit 10) (bye))'
+  [ "$output" = "Hi" ]
+}
+
+@test "e2e: multiple void calls in sequence" {
+  run run_program '(def a () : void (emit 65)) (def b () : void (emit 66)) (def main () : void (a) (b) (emit 10) (bye))'
+  [ "$output" = "AB" ]
+}
+
+@test "e2e: ptr(byte) param with string literal" {
+  run run_program '(def first ((s : (ptr byte))) : byte (deref8 s)) (def main () : void (emit (first "Zap")) (bye))'
+  [ "$output" = "Z" ]
+}
+
+@test "e2e: dict program" {
+  run run_program_file "$BATS_TEST_DIRNAME/../programs/dict.lisp" $'hello\nwords\nfoo\nbye\n'
+  [ "$output" = $'Hello!\nwords hello bye \nfoo ?' ]
 }
