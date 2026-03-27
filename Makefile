@@ -53,13 +53,17 @@ format-check:
 	clang-format --dry-run --Werror $(wildcard src/*.cpp) $(HDRS)
 
 .PHONY: test
-test: quad
+test: quad bats
 
 .PHONY: quad
 quad:
 	@cd compiler && for mod in parser typecheck codegen; do \
 		scryer-prolog -f -g "use_module(library('numerics/quadtests')), check_module_quads($$mod, _), halt." < /dev/null; \
 	done
+
+.PHONY: bats
+bats: $(TARGET) $(GEN_DIR)/gen.pl
+	bats tests/
 
 # Compile .lisp programs to .bin
 programs/%.bin: programs/%.lisp $(GEN_DIR)/gen.pl

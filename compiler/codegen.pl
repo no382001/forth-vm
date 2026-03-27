@@ -77,8 +77,13 @@ compile_body([E | Rest], Env, Consts, LN0, Code, LN) :-
 void_expr(store(_, _)).
 void_expr(store8(_, _)).
 void_expr(while(_, _)).
-void_expr(if(_, _, _)).
 void_expr(call(Name, _)) :- builtin_trap(Name, void, _).
+void_expr(let(_, Body)) :- last_void(Body).
+void_expr(do(Exprs)) :- last_void(Exprs).
+void_expr(if(_, T, E)) :- void_expr(T), void_expr(E).
+
+last_void([E]) :- void_expr(E).
+last_void([_|Rest]) :- Rest = [_|_], last_void(Rest).
 
 %% ============================================================
 %% expressions

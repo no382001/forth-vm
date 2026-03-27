@@ -1,0 +1,164 @@
+#!/usr/bin/env bats
+
+setup() {
+  source "$BATS_TEST_DIRNAME/helpers.sh"
+}
+
+# ============================================================
+# typecheck: should accept
+# ============================================================
+
+@test "typecheck: identity function" {
+  result="$(compile '(def id ((x : int)) : int x)' typed)"
+  [[ "$result" == ok* ]]
+}
+
+@test "typecheck: arithmetic" {
+  result="$(compile '(def f ((a : int) (b : int)) : int (+ a b))' typed)"
+  [[ "$result" == ok* ]]
+}
+
+@test "typecheck: comparison returns bool" {
+  result="$(compile '(def f ((a : int) (b : int)) : bool (< a b))' typed)"
+  [[ "$result" == ok* ]]
+}
+
+@test "typecheck: if expression" {
+  result="$(compile '(def abs ((n : int)) : int (if (< n 0) (- 0 n) n))' typed)"
+  [[ "$result" == ok* ]]
+}
+
+@test "typecheck: let binding" {
+  result="$(compile '(def f ((x : int)) : int (let ((y (+ x 1))) y))' typed)"
+  [[ "$result" == ok* ]]
+}
+
+@test "typecheck: while loop" {
+  result="$(compile '(def f ((n : int)) : void (while (< n 10) (+ n 1)))' typed)"
+  [[ "$result" == ok* ]]
+}
+
+@test "typecheck: pointer deref" {
+  result="$(compile '(def f ((p : (ptr int))) : int (deref p))' typed)"
+  [[ "$result" == ok* ]]
+}
+
+@test "typecheck: pointer store" {
+  result="$(compile '(def f ((p : (ptr int)) (v : int)) : void (store p v))' typed)"
+  [[ "$result" == ok* ]]
+}
+
+@test "typecheck: const" {
+  result="$(compile '(const SIZE int 256) (def f () : int SIZE)' typed)"
+  [[ "$result" == ok* ]]
+}
+
+@test "typecheck: builtin emit" {
+  result="$(compile '(def f () : void (emit 65))' typed)"
+  [[ "$result" == ok* ]]
+}
+
+@test "typecheck: builtin key" {
+  result="$(compile '(def f () : int (key))' typed)"
+  [[ "$result" == ok* ]]
+}
+
+@test "typecheck: string literal is ptr(byte)" {
+  result="$(compile '(def f () : int (deref8 "hi"))' typed)"
+  [[ "$result" == ok* ]]
+}
+
+@test "typecheck: int and ptr compatible" {
+  result="$(compile '(def f ((a : int)) : int (deref8 a))' typed)"
+  [[ "$result" == ok* ]]
+}
+
+@test "typecheck: deref8 on int address" {
+  result="$(compile '(const BUF int 1024) (def f () : byte (deref8 BUF))' typed)"
+  [[ "$result" == ok* ]]
+}
+
+@test "typecheck: store8 with int address" {
+  result="$(compile '(const BUF int 1024) (def f () : void (store8 BUF 0))' typed)"
+  [[ "$result" == ok* ]]
+}
+
+@test "typecheck: function call" {
+  result="$(compile '(def inc ((x : int)) : int (+ x 1)) (def f () : int (inc 5))' typed)"
+  [[ "$result" == ok* ]]
+}
+
+@test "typecheck: do block" {
+  result="$(compile '(def f () : int (do (emit 65) 42))' typed)"
+  [[ "$result" == ok* ]]
+}
+
+# ============================================================
+# typecheck: should reject
+# ============================================================
+
+@test "typecheck rejects: wrong return type" {
+  result="$(compile '(def bad ((n : int)) : bool n)' typed)"
+  [[ "$result" == error* ]]
+}
+
+@test "typecheck rejects: if branch type mismatch" {
+  result="$(compile '(def bad ((n : int)) : int (if (< n 0) 1 (< n 5)))' typed)"
+  [[ "$result" == error* ]]
+}
+
+@test "typecheck rejects: undefined variable" {
+  result="$(compile '(def bad () : int x)' typed)"
+  [[ "$result" == error* ]]
+}
+
+@test "typecheck rejects: wrong arity" {
+  result="$(compile '(def f ((x : int)) : int x) (def g () : int (f 1 2))' typed)"
+  [[ "$result" == error* ]]
+}
+
+# ============================================================
+# end-to-end: compile and run
+# ============================================================
+
+@test "e2e: emit literal" {
+  run run_program '(def main () : void (emit 65) (bye))'
+  [ "$output" = "A" ]
+}
+
+@test "e2e: arithmetic" {
+  run run_program '(def main () : void (emit (+ 60 5)) (bye))'
+  [ "$output" = "A" ]
+}
+
+@test "e2e: if expression" {
+  run run_program '(def main () : void (emit (if (< 1 2) 65 66)) (bye))'
+  [ "$output" = "A" ]
+}
+
+@test "e2e: let binding" {
+  run run_program '(def main () : void (let ((x 65)) (emit x)) (bye))'
+  [ "$output" = "A" ]
+}
+
+@test "e2e: function call" {
+  run run_program '(def add1 ((n : int)) : int (+ n 1)) (def main () : void (emit (add1 64)) (bye))'
+  [ "$output" = "A" ]
+}
+
+@test "e2e: while loop" {
+  run run_program '(const I int 1024) (def main () : void (store I 65) (while (< (deref I) 68) (emit (deref I)) (store I (+ (deref I) 1))) (bye))'
+  [ "$output" = "ABC" ]
+}
+
+@test "e2e: string literal first byte" {
+  run run_program '(def main () : void (emit (deref8 "Hello")) (bye))'
+  [ "$output" = "H" ]
+}
+
+@test "e2e: echo program" {
+  run run_program \
+    '(const BUF int 1028) (const I int 1026) (const C int 1024) (def main () : void (store I 0) (while (do (store C (key)) (!= (deref C) 10)) (store8 (+ BUF (deref I)) (deref C)) (store I (+ (deref I) 1))) (store8 (+ BUF (deref I)) 0) (store I 0) (while (!= (deref8 (+ BUF (deref I))) 0) (emit (deref8 (+ BUF (deref I)))) (store I (+ (deref I) 1))) (bye))' \
+    $'hello\n'
+  [ "$output" = "hello" ]
+}
