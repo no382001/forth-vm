@@ -86,6 +86,10 @@ compile_from_forms(Forms, Target, Result) :-
                 ( Target = effects ->
                     Result = ok(EffectEnv)
                 ;
+                effects:check_annotations(TypedDefs, EffectEnv, EffErrors),
+                ( EffErrors \= [] ->
+                    Result = error(effects, EffErrors)
+                ;
                 codegen:compile_program(TypedDefs, CgResult),
                 ( CgResult \= ok(_) ->
                     Result = error(codegen, CgResult)
@@ -101,6 +105,7 @@ compile_from_forms(Forms, Target, Result) :-
                       emit:emit_binary(AllTokens, Bytes),
                       Result = ok(Bytes)
                   )
+                )
                 )
                 )
             )

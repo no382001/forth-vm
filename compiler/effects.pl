@@ -1,4 +1,4 @@
-:- module(effects, [infer_effects/2, effect_join/3]).
+:- module(effects, [infer_effects/2, effect_join/3, check_annotations/3]).
 
 :- use_module(library(lists)).
 
@@ -35,7 +35,7 @@ infer_effects(Defs, EffectEnv) :-
     fixpoint(Defs, Init, EffectEnv).
 
 init_effects([], []).
-init_effects([def(Name, _, _, _)|Rest], [eff(Name, det)|Effs]) :-
+init_effects([def(Name, _, _, _, _)|Rest], [eff(Name, det)|Effs]) :-
     init_effects(Rest, Effs).
 init_effects([const(_, _, _)|Rest], Effs) :-
     init_effects(Rest, Effs).
@@ -51,7 +51,7 @@ fixpoint(Defs, Env, Result) :-
     ).
 
 infer_all([], Env, Env).
-infer_all([def(Name, _, _, Body)|Rest], Env, Result) :-
+infer_all([def(Name, _, _, _, Body)|Rest], Env, Result) :-
     infer_body_effect(Body, Env, Eff),
     update_effect(Name, Eff, Env, Env1),
     infer_all(Rest, Env1, Result).
@@ -170,3 +170,30 @@ infer_bindings_effect([bind(_, Expr)|Rest], Env, Eff) :-
     infer_expr_effect(Expr, Env, EE),
     infer_bindings_effect(Rest, Env, ERest),
     effect_join(EE, ERest, Eff).
+
+%% ============================================================
+%% annotation checking
+%% ============================================================
+
+%% check_annotations(+Defs, +EffectEnv, -Errors)
+%% Verify declared effects are at least as permissive as inferred.
+check_annotations([], _, []).
+check_annotations([def(Name, _, _, Decl, _)|Rest], Env, Errors) :-
+    ( Decl = none ->
+        check_annotations(Rest, Env, Errors)
+    ; member(eff(Name, Inferred), Env) ->
+        effect_level(Decl, DL),
+        effect_level(Inferred, IL),
+        ( IL > DL ->
+            Errors = [effect_mismatch(Name, Decl, Inferred)|RestErrors],
+            check_annotations(Rest, Env, RestErrors)
+        ;
+            check_annotations(Rest, Env, Errors)
+        )
+    ;
+        check_annotations(Rest, Env, Errors)
+    ).
+check_annotations([const(_, _, _)|Rest], Env, Errors) :-
+    check_annotations(Rest, Env, Errors).
+check_annotations([extern(_, _, _)|Rest], Env, Errors) :-
+    check_annotations(Rest, Env, Errors).

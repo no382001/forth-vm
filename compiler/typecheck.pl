@@ -29,7 +29,7 @@ builtin_env(Env) :-
 %% ============================================================
 
 build_func_env([], Env, Env).
-build_func_env([def(Name, Params, RetType, _Body) | Rest], Acc, Env) :-
+build_func_env([def(Name, Params, RetType, _, _Body) | Rest], Acc, Env) :-
     param_types(Params, PTypes),
     build_func_env(Rest, [func(Name, PTypes, RetType) | Acc], Env).
 build_func_env([extern(Name, PTypes, RetType) | Rest], Acc, Env) :-
@@ -59,7 +59,7 @@ check_def(const(Name, Type, Expr), FuncEnv, Errors) :-
     ;
         Errors = [type_mismatch(const, Name, Type)]
     ).
-check_def(def(Name, Params, RetType, Body), FuncEnv, Errors) :-
+check_def(def(Name, Params, RetType, _, Body), FuncEnv, Errors) :-
     params_to_env(Params, LocalEnv),
     check_body(Body, LocalEnv, FuncEnv, RetType, Name, Errors).
 

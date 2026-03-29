@@ -19,7 +19,7 @@ register_void_funcs(Defs) :-
 
 register_void_funcs_([]).
 register_void_funcs_([Def | Rest]) :-
-    ( Def = def(Name, _, void, _) ->
+    ( Def = def(Name, _, void, _, _) ->
         assertz(user_void_func(Name))
     ;
         true
@@ -49,7 +49,7 @@ compile_defs([Def | Rest], Consts, LN0, Slot0, Code) :-
 compile_def(extern(_, _, _), _, LN, Slot, [], LN, Slot).
 compile_def(const(_, _, _), _, LN, Slot, [], LN, Slot).
 
-compile_def(def(Name, Params, _RetType, Body), Consts, LN0, Slot0, Code, LN, SlotAfter) :-
+compile_def(def(Name, Params, _RetType, _, Body), Consts, LN0, Slot0, Code, LN, SlotAfter) :-
     %% Allocate slots for params
     alloc_params(Params, Slot0, ParamEnv, SlotParams),
     %% Generate prologue: pop args from stack into memory slots

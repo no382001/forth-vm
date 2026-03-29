@@ -15,12 +15,13 @@ transform_program(Forms, Result) :-
 %% top-level forms
 %% ============================================================
 
-%% (def name (params...) : ret-type body)
+%% (def name (params...) : ret-type [effect] body)
 transform(list([sym(def), sym(Name), list(RawParams), sym(:), RetTy | BodyForms]),
-          def(Name, Params, RetType, Body)) :-
+          def(Name, Params, RetType, DeclEffect, Body)) :-
     maplist(transform_param, RawParams, Params),
     transform_type(RetTy, RetType),
-    maplist(transform, BodyForms, Body).
+    parse_optional_effect(BodyForms, DeclEffect, ActualBody),
+    maplist(transform, ActualBody, Body).
 
 %% (extern name (param-types...) : ret-type)
 transform(list([sym(extern), sym(Name), list(RawParamTypes), sym(:), RetTy]),
@@ -113,6 +114,12 @@ transform_param(list([sym(Name), sym(:), TypeSym]), param(Name, Type)) :-
 
 transform_binding(list([sym(Name), Expr]), bind(Name, TE)) :-
     transform(Expr, TE).
+
+%% parse optional effect annotation from body forms
+parse_optional_effect([sym(det) | Rest], det, Rest) :- Rest \= [].
+parse_optional_effect([sym(semidet) | Rest], semidet, Rest) :- Rest \= [].
+parse_optional_effect([sym(nondet) | Rest], nondet, Rest) :- Rest \= [].
+parse_optional_effect(Body, none, Body).
 
 transform_type(sym(int), int).
 transform_type(sym(byte), byte).
