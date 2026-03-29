@@ -422,3 +422,57 @@ setup() {
   warnings="$(compile_warnings '(def target () : void (emit 65)) (def main () : void (execute (addr target)) (bye))')"
   [[ -z "$warnings" ]]
 }
+
+# ============================================================
+# constant folding
+# ============================================================
+
+@test "constfold: det call with constants is folded" {
+  result="$(compile '(def double ((x : int)) : int (+ x x)) (def main () : void (emit (double 33)) (bye))' ir)"
+  # double(33) should be folded to lit(66), no call to double
+  [[ "$result" == *"lit(66)"* ]]
+  [[ "$result" != *"call"* ]]
+}
+
+@test "constfold: folded program runs correctly" {
+  run run_program '(def double ((x : int)) : int (+ x x)) (def main () : void (emit (double 33)) (bye))'
+  [ "$output" = "B" ]
+}
+
+@test "constfold: binop with two constants is folded" {
+  result="$(compile '(def main () : void (emit (+ 60 5)) (bye))' ir)"
+  [[ "$result" == *"lit(65)"* ]]
+}
+
+@test "constfold: nested det calls folded" {
+  result="$(compile '(def inc ((x : int)) : int (+ x 1)) (def add2 ((x : int)) : int (inc (inc x))) (def main () : void (emit (add2 63)) (bye))' ir)"
+  [[ "$result" == *"lit(65)"* ]]
+}
+
+@test "constfold: nested det calls run correctly" {
+  run run_program '(def inc ((x : int)) : int (+ x 1)) (def add2 ((x : int)) : int (inc (inc x))) (def main () : void (emit (add2 63)) (bye))'
+  [ "$output" = "A" ]
+}
+
+@test "constfold: nondet function not folded" {
+  result="$(compile '(def f () : void (emit 65)) (def main () : void (f) (bye))' ir)"
+  # f() has side effects, should remain as a call
+  [[ "$result" == *"label(f)"* ]]
+}
+
+@test "constfold: semidet function not folded" {
+  result="$(compile '(const P int 1024) (def f () : int (deref P)) (def main () : void (emit (f)) (bye))' ir)"
+  # deref is semidet, should not be folded
+  [[ "$result" == *"label(f)"* ]]
+}
+
+@test "constfold: if with constant condition folded" {
+  result="$(compile '(def main () : void (emit (if (< 1 2) 65 66)) (bye))' ir)"
+  [[ "$result" == *"lit(65)"* ]]
+}
+
+@test "constfold: det with non-constant arg not folded" {
+  result="$(compile '(def inc ((x : int)) : int (+ x 1)) (def main ((n : int)) : void (emit (inc n)) (bye))' ir)"
+  # n is a variable, can not fold
+  [[ "$result" == *"label(inc)"* ]]
+}

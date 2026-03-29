@@ -8,6 +8,7 @@
 :- use_module(emit).
 :- use_module(effects).
 :- use_module(deadcode).
+:- use_module(constfold).
 
 :- use_module(library(lists)).
 :- use_module(library(format)).
@@ -94,7 +95,9 @@ compile_from_forms(Forms, Target, Result) :-
                 %% Stage 3.6: dead code warnings (non-fatal, to stderr)
                 deadcode:find_dead_code(TypedDefs, DeadNames),
                 warn_dead_code(DeadNames),
-                codegen:compile_program(TypedDefs, CgResult),
+                %% Stage 3.7: constant folding for det functions
+                constfold:fold_constants(TypedDefs, EffectEnv, FoldedDefs),
+                codegen:compile_program(FoldedDefs, CgResult),
                 ( CgResult \= ok(_) ->
                     Result = error(codegen, CgResult)
                 ; CgResult = ok(Tokens),

@@ -110,7 +110,7 @@ infer_expr_effect(if(C, T, E), Env, Eff) :-
     infer_expr_effect(C, Env, EC),
     infer_expr_effect(T, Env, ET),
     infer_expr_effect(E, Env, EE),
-    effect_join_list([EC, ET, EE], Eff).
+    effect_join_list([EC, ET, EE], Eff). % this could be a lambda?
 
 %% let -> bindings + body
 infer_expr_effect(let(Bindings, Body), Env, Eff) :-
