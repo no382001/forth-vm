@@ -7,6 +7,7 @@
 :- use_module(codegen).
 :- use_module(emit).
 :- use_module(effects).
+:- use_module(deadcode).
 
 :- use_module(library(lists)).
 :- use_module(library(format)).
@@ -90,6 +91,9 @@ compile_from_forms(Forms, Target, Result) :-
                 ( EffErrors \= [] ->
                     Result = error(effects, EffErrors)
                 ;
+                %% Stage 3.6: dead code warnings (non-fatal, to stderr)
+                deadcode:find_dead_code(TypedDefs, DeadNames),
+                warn_dead_code(DeadNames),
                 codegen:compile_program(TypedDefs, CgResult),
                 ( CgResult \= ok(_) ->
                     Result = error(codegen, CgResult)
@@ -193,6 +197,20 @@ file_directory(Path, Dir) :-
     ;
         Dir = './'
     ).
+
+%% dead code warnings to stderr
+warn_dead_code([]).
+warn_dead_code([Name|Rest]) :-
+    atom_chars(Name, NameChars),
+    append("warning: unused function '", NameChars, P1),
+    append(P1, "'\n", Msg),
+    current_output(StdOut),
+    open('/dev/stderr', write, Err),
+    set_output(Err),
+    maplist(put_char, Msg),
+    close(Err),
+    set_output(StdOut),
+    warn_dead_code(Rest).
 
 read_source(File, Chars) :-
     open(File, read, S),

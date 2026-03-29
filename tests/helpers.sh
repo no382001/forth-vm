@@ -24,6 +24,25 @@ compile() {
   rm -f "$srcfile"
 }
 
+# compile_warnings <source> [target]
+# Like compile, but returns stderr (warnings) instead of stdout.
+compile_warnings() {
+  local src="$1" target="${2:-binary}"
+  local srcfile
+  srcfile="$(mktemp /tmp/forth-XXXXXX.sets)"
+  printf '%s' "$src" > "$srcfile"
+  (
+    cd "$COMPILER_DIR"
+    $PROLOG -g "
+      use_module(compiler),
+      compiler:read_source('$srcfile', Chars),
+      compile_source(Chars, $target, R),
+      write(R), nl, halt.
+    " < /dev/null 2>&1 1>/dev/null
+  )
+  rm -f "$srcfile"
+}
+
 # run_program <source> [stdin_input]
 # Compile source to binary, run it on the VM with optional input.
 run_program() {

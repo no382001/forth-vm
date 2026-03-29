@@ -392,3 +392,33 @@ setup() {
   result="$(compile '(def main () : void (emit 65) (bye))' binary)"
   [[ "$result" == ok* ]]
 }
+
+# ============================================================
+# dead code warnings
+# ============================================================
+
+@test "deadcode: warns on unused function" {
+  warnings="$(compile_warnings '(def unused () : int 42) (def main () : void (emit 65) (bye))')"
+  [[ "$warnings" == *"unused function"*"unused"* ]]
+}
+
+@test "deadcode: no warning when function is called" {
+  warnings="$(compile_warnings '(def helper () : int 42) (def main () : void (emit (helper)) (bye))')"
+  [[ -z "$warnings" ]]
+}
+
+@test "deadcode: no warning for main" {
+  warnings="$(compile_warnings '(def main () : void (emit 65) (bye))')"
+  [[ -z "$warnings" ]]
+}
+
+@test "deadcode: warns multiple unused functions" {
+  warnings="$(compile_warnings '(def a () : int 1) (def b () : int 2) (def main () : void (emit 65) (bye))')"
+  [[ "$warnings" == *"unused function"*"a"* ]]
+  [[ "$warnings" == *"unused function"*"b"* ]]
+}
+
+@test "deadcode: addr counts as reference" {
+  warnings="$(compile_warnings '(def target () : void (emit 65)) (def main () : void (execute (addr target)) (bye))')"
+  [[ -z "$warnings" ]]
+}
