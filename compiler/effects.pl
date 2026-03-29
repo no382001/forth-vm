@@ -1,0 +1,172 @@
+:- module(effects, [infer_effects/2, effect_join/3]).
+
+:- use_module(library(lists)).
+
+%% ============================================================
+%% effect lattice
+%% ============================================================
+
+%% ordering: det < semidet < nondet
+effect_level(det, 0).
+effect_level(semidet, 1).
+effect_level(nondet, 2).
+
+%% join: max of two effects
+effect_join(A, B, R) :-
+    effect_level(A, LA),
+    effect_level(B, LB),
+    Max is max(LA, LB),
+    effect_level(R, Max).
+
+%% join a list of effects
+effect_join_list([], det).
+effect_join_list([E|Es], R) :-
+    effect_join_list(Es, Rest),
+    effect_join(E, Rest, R).
+
+%% ============================================================
+%% entry point
+%% ============================================================
+
+%% infer_effects(+Defs, -EffectEnv)
+%% Fixed-point iteration: start all as det, re-infer until stable.
+infer_effects(Defs, EffectEnv) :-
+    init_effects(Defs, Init),
+    fixpoint(Defs, Init, EffectEnv).
+
+init_effects([], []).
+init_effects([def(Name, _, _, _)|Rest], [eff(Name, det)|Effs]) :-
+    init_effects(Rest, Effs).
+init_effects([const(_, _, _)|Rest], Effs) :-
+    init_effects(Rest, Effs).
+init_effects([extern(_, _, _)|Rest], Effs) :-
+    init_effects(Rest, Effs).
+
+fixpoint(Defs, Env, Result) :-
+    infer_all(Defs, Env, NewEnv),
+    ( Env = NewEnv ->
+        Result = Env
+    ;
+        fixpoint(Defs, NewEnv, Result)
+    ).
+
+infer_all([], Env, Env).
+infer_all([def(Name, _, _, Body)|Rest], Env, Result) :-
+    infer_body_effect(Body, Env, Eff),
+    update_effect(Name, Eff, Env, Env1),
+    infer_all(Rest, Env1, Result).
+infer_all([const(_, _, _)|Rest], Env, Result) :-
+    infer_all(Rest, Env, Result).
+infer_all([extern(_, _, _)|Rest], Env, Result) :-
+    infer_all(Rest, Env, Result).
+
+update_effect(Name, Eff, [], [eff(Name, Eff)]).
+update_effect(Name, Eff, [eff(Name, _)|Rest], [eff(Name, Eff)|Rest]) :- !.
+update_effect(Name, Eff, [Other|Rest], [Other|Rest1]) :-
+    update_effect(Name, Eff, Rest, Rest1).
+
+%% ============================================================
+%% infer effect of an expression
+%% ============================================================
+
+infer_expr_effect(num(_), _, det).
+infer_expr_effect(str(_), _, det).
+infer_expr_effect(var(_), _, det).
+
+%% memory operations -> semidet
+infer_expr_effect(deref(E), Env, Eff) :-
+    infer_expr_effect(E, Env, ChildEff),
+    effect_join(semidet, ChildEff, Eff).
+infer_expr_effect(deref8(E), Env, Eff) :-
+    infer_expr_effect(E, Env, ChildEff),
+    effect_join(semidet, ChildEff, Eff).
+infer_expr_effect(store(A, V), Env, Eff) :-
+    infer_expr_effect(A, Env, EA),
+    infer_expr_effect(V, Env, EV),
+    effect_join(EA, EV, EArgs),
+    effect_join(semidet, EArgs, Eff).
+infer_expr_effect(store8(A, V), Env, Eff) :-
+    infer_expr_effect(A, Env, EA),
+    infer_expr_effect(V, Env, EV),
+    effect_join(EA, EV, EArgs),
+    effect_join(semidet, EArgs, Eff).
+
+%% execute -> nondet (unknown target)
+infer_expr_effect(execute(E), Env, Eff) :-
+    infer_expr_effect(E, Env, ChildEff),
+    effect_join(nondet, ChildEff, Eff).
+
+%% addr -> det (just gets an address, no side effect)
+infer_expr_effect(addr(_), _, det).
+
+%% binary ops -> det + children
+infer_expr_effect(binop(_, A, B), Env, Eff) :-
+    infer_expr_effect(A, Env, EA),
+    infer_expr_effect(B, Env, EB),
+    effect_join(EA, EB, Eff).
+
+%% if -> children
+infer_expr_effect(if(C, T, E), Env, Eff) :-
+    infer_expr_effect(C, Env, EC),
+    infer_expr_effect(T, Env, ET),
+    infer_expr_effect(E, Env, EE),
+    effect_join_list([EC, ET, EE], Eff).
+
+%% let -> bindings + body
+infer_expr_effect(let(Bindings, Body), Env, Eff) :-
+    infer_bindings_effect(Bindings, Env, EB),
+    infer_body_effect(Body, Env, EBody),
+    effect_join(EB, EBody, Eff).
+
+%% do -> all children
+infer_expr_effect(do(Exprs), Env, Eff) :-
+    infer_body_effect(Exprs, Env, Eff).
+
+%% while -> cond + body (also semidet at minimum since it's stateful looping)
+infer_expr_effect(while(Cond, Body), Env, Eff) :-
+    infer_expr_effect(Cond, Env, EC),
+    infer_body_effect(Body, Env, EB),
+    effect_join(EC, EB, Eff).
+
+%% function call -> callee's effect + args effects
+infer_expr_effect(call(Name, Args), Env, Eff) :-
+    infer_args_effect(Args, Env, EArgs),
+    ( builtin_effect(Name, BEff) ->
+        effect_join(BEff, EArgs, Eff)
+    ; member(eff(Name, FnEff), Env) ->
+        effect_join(FnEff, EArgs, Eff)
+    ;
+        %% unknown function — assume nondet
+        effect_join(nondet, EArgs, Eff)
+    ).
+
+%% ============================================================
+%% built-in function effects
+%% ============================================================
+
+builtin_effect(emit, nondet).
+builtin_effect(key, nondet).
+builtin_effect(bye, nondet).
+builtin_effect('assert-fail', nondet).
+
+%% ============================================================
+%% helpers
+%% ============================================================
+
+infer_body_effect([], _, det).
+infer_body_effect([E|Es], Env, Eff) :-
+    infer_expr_effect(E, Env, EE),
+    infer_body_effect(Es, Env, ERest),
+    effect_join(EE, ERest, Eff).
+
+infer_args_effect([], _, det).
+infer_args_effect([A|As], Env, Eff) :-
+    infer_expr_effect(A, Env, EA),
+    infer_args_effect(As, Env, ERest),
+    effect_join(EA, ERest, Eff).
+
+infer_bindings_effect([], _, det).
+infer_bindings_effect([bind(_, Expr)|Rest], Env, Eff) :-
+    infer_expr_effect(Expr, Env, EE),
+    infer_bindings_effect(Rest, Env, ERest),
+    effect_join(EE, ERest, Eff).

@@ -260,3 +260,91 @@ setup() {
   run run_program "$prog"
   [ "$output" = "Y" ]
 }
+
+# ============================================================
+# effects: inference
+# ============================================================
+
+@test "effects: pure arithmetic is det" {
+  result="$(compile '(def f ((x : int)) : int (+ x 1))' effects)"
+  [[ "$result" == *"eff(f,det)"* ]]
+}
+
+@test "effects: emit is nondet" {
+  result="$(compile '(def f () : void (emit 65))' effects)"
+  [[ "$result" == *"eff(f,nondet)"* ]]
+}
+
+@test "effects: key is nondet" {
+  result="$(compile '(def f () : int (key))' effects)"
+  [[ "$result" == *"eff(f,nondet)"* ]]
+}
+
+@test "effects: bye is nondet" {
+  result="$(compile '(def f () : void (bye))' effects)"
+  [[ "$result" == *"eff(f,nondet)"* ]]
+}
+
+@test "effects: deref is semidet" {
+  result="$(compile '(def f ((p : (ptr int))) : int (deref p))' effects)"
+  [[ "$result" == *"eff(f,semidet)"* ]]
+}
+
+@test "effects: deref8 is semidet" {
+  result="$(compile '(def f ((p : (ptr byte))) : byte (deref8 p))' effects)"
+  [[ "$result" == *"eff(f,semidet)"* ]]
+}
+
+@test "effects: store is semidet" {
+  result="$(compile '(def f ((p : (ptr int)) (v : int)) : void (store p v))' effects)"
+  [[ "$result" == *"eff(f,semidet)"* ]]
+}
+
+@test "effects: store8 is semidet" {
+  result="$(compile '(def f ((p : (ptr byte)) (v : byte)) : void (store8 p v))' effects)"
+  [[ "$result" == *"eff(f,semidet)"* ]]
+}
+
+@test "effects: if/let/while stay det when pure" {
+  result="$(compile '(def f ((n : int)) : int (if (< n 0) (- 0 n) n))' effects)"
+  [[ "$result" == *"eff(f,det)"* ]]
+}
+
+@test "effects: call propagates callee effect" {
+  result="$(compile '(def pure ((x : int)) : int (+ x 1)) (def impure () : void (emit (pure 5)))' effects)"
+  [[ "$result" == *"eff(pure,det)"* ]]
+  [[ "$result" == *"eff(impure,nondet)"* ]]
+}
+
+@test "effects: semidet caller of det callee stays semidet" {
+  result="$(compile '(def inc ((x : int)) : int (+ x 1)) (def f ((p : (ptr int))) : void (store p (inc 5)))' effects)"
+  [[ "$result" == *"eff(inc,det)"* ]]
+  [[ "$result" == *"eff(f,semidet)"* ]]
+}
+
+@test "effects: transitive nondet through call chain" {
+  result="$(compile '(def a () : void (emit 65)) (def b () : void (a)) (def c () : void (b))' effects)"
+  [[ "$result" == *"eff(a,nondet)"* ]]
+  [[ "$result" == *"eff(b,nondet)"* ]]
+  [[ "$result" == *"eff(c,nondet)"* ]]
+}
+
+@test "effects: addr is det" {
+  result="$(compile '(def f () : int (addr f))' effects)"
+  [[ "$result" == *"eff(f,det)"* ]]
+}
+
+@test "effects: execute is nondet" {
+  result="$(compile '(def f ((p : int)) : void (execute p))' effects)"
+  [[ "$result" == *"eff(f,nondet)"* ]]
+}
+
+@test "effects: do block joins children" {
+  result="$(compile '(def f ((p : (ptr int))) : int (do (store p 1) (deref p)))' effects)"
+  [[ "$result" == *"eff(f,semidet)"* ]]
+}
+
+@test "effects: while with semidet body is semidet" {
+  result="$(compile '(const I int 1024) (def f () : void (while (< (deref I) 10) (store I (+ (deref I) 1))))' effects)"
+  [[ "$result" == *"eff(f,semidet)"* ]]
+}

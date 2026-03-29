@@ -6,6 +6,7 @@
 :- use_module(typecheck).
 :- use_module(codegen).
 :- use_module(emit).
+:- use_module(effects).
 
 :- use_module(library(lists)).
 :- use_module(library(format)).
@@ -80,6 +81,11 @@ compile_from_forms(Forms, Target, Result) :-
             ( Target = typed ->
                 Result = ok(TypedDefs)
             ;
+                %% Stage 3.5: effect inference
+                effects:infer_effects(TypedDefs, EffectEnv),
+                ( Target = effects ->
+                    Result = ok(EffectEnv)
+                ;
                 codegen:compile_program(TypedDefs, CgResult),
                 ( CgResult \= ok(_) ->
                     Result = error(codegen, CgResult)
@@ -95,6 +101,7 @@ compile_from_forms(Forms, Target, Result) :-
                       emit:emit_binary(AllTokens, Bytes),
                       Result = ok(Bytes)
                   )
+                )
                 )
             )
           )
