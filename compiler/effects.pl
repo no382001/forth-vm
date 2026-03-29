@@ -1,4 +1,4 @@
-:- module(effects, [infer_effects/2, effect_join/3, check_annotations/3]).
+:- module(effects, [infer_effects/2, effect_join/3, check_annotations/4]).
 
 :- use_module(library(lists)).
 
@@ -175,25 +175,27 @@ infer_bindings_effect([bind(_, Expr)|Rest], Env, Eff) :-
 %% annotation checking
 %% ============================================================
 
-%% check_annotations(+Defs, +EffectEnv, -Errors)
+%% check_annotations(+Defs, +EffectEnv, +LineMap, -Errors)
 %% Verify declared effects are at least as permissive as inferred.
-check_annotations([], _, []).
-check_annotations([def(Name, _, _, Decl, _)|Rest], Env, Errors) :-
+%% LineMap = [Name-Line, ...] mapping def names to source line numbers.
+check_annotations([], _, _, []).
+check_annotations([def(Name, _, _, Decl, _)|Rest], Env, LineMap, Errors) :-
     ( Decl = none ->
-        check_annotations(Rest, Env, Errors)
+        check_annotations(Rest, Env, LineMap, Errors)
     ; member(eff(Name, Inferred), Env) ->
         effect_level(Decl, DL),
         effect_level(Inferred, IL),
         ( IL > DL ->
-            Errors = [effect_mismatch(Name, Decl, Inferred)|RestErrors],
-            check_annotations(Rest, Env, RestErrors)
+            ( member(Name-Loc, LineMap) -> true ; Loc = unknown ),
+            Errors = [effect_mismatch(Name, Decl, Inferred, Loc)|RestErrors],
+            check_annotations(Rest, Env, LineMap, RestErrors)
         ;
-            check_annotations(Rest, Env, Errors)
+            check_annotations(Rest, Env, LineMap, Errors)
         )
     ;
-        check_annotations(Rest, Env, Errors)
+        check_annotations(Rest, Env, LineMap, Errors)
     ).
-check_annotations([const(_, _, _)|Rest], Env, Errors) :-
-    check_annotations(Rest, Env, Errors).
-check_annotations([extern(_, _, _)|Rest], Env, Errors) :-
-    check_annotations(Rest, Env, Errors).
+check_annotations([const(_, _, _)|Rest], Env, LineMap, Errors) :-
+    check_annotations(Rest, Env, LineMap, Errors).
+check_annotations([extern(_, _, _)|Rest], Env, LineMap, Errors) :-
+    check_annotations(Rest, Env, LineMap, Errors).

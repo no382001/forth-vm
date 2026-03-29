@@ -375,17 +375,17 @@ setup() {
 
 @test "effects annotation rejects: det on nondet fn" {
   result="$(compile '(def f () : void [det] (emit 65))' binary)"
-  [[ "$result" == error\(effects* ]]
+  [[ "$result" == *"declared [det] but inferred nondet"* ]]
 }
 
 @test "effects annotation rejects: det on semidet fn" {
   result="$(compile '(def f ((p : (ptr int))) : int [det] (deref p))' binary)"
-  [[ "$result" == error\(effects* ]]
+  [[ "$result" == *"declared [det] but inferred semidet"* ]]
 }
 
 @test "effects annotation rejects: semidet on nondet fn" {
   result="$(compile '(def f () : void [semidet] (emit 65))' binary)"
-  [[ "$result" == error\(effects* ]]
+  [[ "$result" == *"declared [semidet] but inferred nondet"* ]]
 }
 
 @test "effects annotation: unannotated fn still compiles" {
@@ -395,53 +395,53 @@ setup() {
 
 @test "effects annotation rejects: det on store" {
   result="$(compile '(def f ((p : (ptr int))) : void [det] (store p 1))' binary)"
-  [[ "$result" == error\(effects* ]]
+  [[ "$result" == *"declared [det] but inferred semidet"* ]]
 }
 
 @test "effects annotation rejects: det on store8" {
   result="$(compile '(def f ((p : (ptr byte))) : void [det] (store8 p 0))' binary)"
-  [[ "$result" == error\(effects* ]]
+  [[ "$result" == *"declared [det] but inferred semidet"* ]]
 }
 
 @test "effects annotation rejects: det on deref8" {
   result="$(compile '(def f ((p : (ptr byte))) : byte [det] (deref8 p))' binary)"
-  [[ "$result" == error\(effects* ]]
+  [[ "$result" == *"declared [det] but inferred semidet"* ]]
 }
 
 @test "effects annotation rejects: det on key" {
   result="$(compile '(def f () : int [det] (key))' binary)"
-  [[ "$result" == error\(effects* ]]
+  [[ "$result" == *"declared [det] but inferred nondet"* ]]
 }
 
 @test "effects annotation rejects: semidet on key" {
   result="$(compile '(def f () : int [semidet] (key))' binary)"
-  [[ "$result" == error\(effects* ]]
+  [[ "$result" == *"declared [semidet] but inferred nondet"* ]]
 }
 
 @test "effects annotation rejects: semidet on bye" {
   result="$(compile '(def f () : void [semidet] (bye))' binary)"
-  [[ "$result" == error\(effects* ]]
+  [[ "$result" == *"declared [semidet] but inferred nondet"* ]]
 }
 
 @test "effects annotation rejects: det on execute" {
   result="$(compile '(def f ((p : int)) : void [det] (execute p))' binary)"
-  [[ "$result" == error\(effects* ]]
+  [[ "$result" == *"declared [det] but inferred nondet"* ]]
 }
 
 @test "effects annotation rejects: transitive nondet via call" {
   result="$(compile '(def io () : void (emit 65)) (def f () : void [det] (io))' binary)"
-  [[ "$result" == error\(effects* ]]
+  [[ "$result" == *"declared [det] but inferred nondet"* ]]
 }
 
 @test "effects annotation rejects: transitive semidet via call" {
   result="$(compile '(const P int 1024) (def rd () : int (deref P)) (def f () : int [det] (rd))' binary)"
-  [[ "$result" == error\(effects* ]]
+  [[ "$result" == *"declared [det] but inferred semidet"* ]]
 }
 
 @test "effects annotation: correct fn compiles despite wrong sibling" {
   result="$(compile '(def good () : int [det] (+ 1 2)) (def bad () : void [det] (emit 65))' binary)"
-  [[ "$result" == error\(effects* ]]
-  [[ "$result" == *"bad"* ]]
+  [[ "$result" == *"bad"*"declared [det] but inferred nondet"* ]]
+  [[ "$result" != *"good"*"declared"* ]]
 }
 
 # ============================================================

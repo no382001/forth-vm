@@ -30,10 +30,11 @@ compile_source(Source, Target, Result) :-
     ; ParseResult = ok(Forms),
       %% Stage 1.5: meta-expansion ($section, $alloc, $vm-sp, etc.)
       expand_metas(Forms, Expanded),
+      compute_def_lines(Source, DefLines),
       ( Target = parsed ->
           Result = ok(Expanded)
       ;
-          compile_from_forms(Expanded, Target, Result)
+          compile_from_forms(Expanded, Target, DefLines, Result)
       )
     ).
 
@@ -58,17 +59,19 @@ compile_source_with_includes(Source, BaseDir, Target, Result) :-
     ( ParseResult \= ok(_) ->
         Result = error(parse, ParseResult)
     ; ParseResult = ok(Forms),
-      expand_includes(Forms, BaseDir, IncExpanded),
+      compute_def_lines(Source, MainDefLines),
+      expand_includes(Forms, BaseDir, IncExpanded, IncDefLines),
+      append(MainDefLines, IncDefLines, DefLines),
       expand_metas(IncExpanded, Expanded),
       ( Target = parsed ->
           Result = ok(Expanded)
       ;
-          compile_from_forms(Expanded, Target, Result)
+          compile_from_forms(Expanded, Target, DefLines, Result)
       )
     ).
 
 %% compile pipeline from already-parsed (and include-expanded) forms
-compile_from_forms(Forms, Target, Result) :-
+compile_from_forms(Forms, Target, DefLines, Result) :-
     ast:transform_program(Forms, AstResult),
     ( AstResult \= ok(_) ->
         Result = error(ast, AstResult)
@@ -88,8 +91,9 @@ compile_from_forms(Forms, Target, Result) :-
                 ( Target = effects ->
                     Result = ok(EffectEnv)
                 ;
-                effects:check_annotations(TypedDefs, EffectEnv, EffErrors),
+                effects:check_annotations(TypedDefs, EffectEnv, DefLines, EffErrors),
                 ( EffErrors \= [] ->
+                    format_effect_errors(EffErrors),
                     Result = error(effects, EffErrors)
                 ;
                 %% Stage 3.6: dead code warnings (non-fatal, to stderr)
@@ -124,8 +128,8 @@ compile_from_forms(Forms, Target, Result) :-
 %% include expansion
 %% ============================================================
 
-expand_includes([], _, []).
-expand_includes([list([sym(include), str(File)])|Rest], BaseDir, Expanded) :-
+expand_includes([], _, [], []).
+expand_includes([list([sym(include), str(File)])|Rest], BaseDir, Expanded, DefLines) :-
     !,
     atom_chars(BaseDir, BaseDirChars),
     append(BaseDirChars, File, FullPathChars),
@@ -133,16 +137,20 @@ expand_includes([list([sym(include), str(File)])|Rest], BaseDir, Expanded) :-
     read_source(FullPath, IncChars),
     parser:parse(IncChars, IncResult),
     ( IncResult = ok(IncForms) ->
+        atom_chars(FileAtom, File),
+        compute_def_lines_file(IncChars, FileAtom, FileDefLines),
         file_directory(FullPath, IncDir),
-        expand_includes(IncForms, IncDir, ExpandedInc),
-        expand_includes(Rest, BaseDir, ExpandedRest),
-        append(ExpandedInc, ExpandedRest, Expanded)
+        expand_includes(IncForms, IncDir, ExpandedInc, IncDefLines),
+        expand_includes(Rest, BaseDir, ExpandedRest, RestDefLines),
+        append(ExpandedInc, ExpandedRest, Expanded),
+        append(FileDefLines, IncDefLines, DL1),
+        append(DL1, RestDefLines, DefLines)
     ;
         format("include error: ~w: ~w~n", [File, IncResult]),
         halt(1)
     ).
-expand_includes([F|Rest], BaseDir, [F|ExpandedRest]) :-
-    expand_includes(Rest, BaseDir, ExpandedRest).
+expand_includes([F|Rest], BaseDir, [F|ExpandedRest], DefLines) :-
+    expand_includes(Rest, BaseDir, ExpandedRest, DefLines).
 
 %% ============================================================
 %% meta-expansion: $vm-sp, $vm-rp, $vm-ip, $cell, $mem,
@@ -201,24 +209,140 @@ file_directory(Path, Dir) :-
         Dir = './'
     ).
 
+%% ANSI color helpers
+esc_code(Codes) :- char_code(Esc, 27), Codes = [Esc, '['].
+
+ansi_bold(Text, Colored) :-
+    esc_code(E), append(E, "1m", Pre),
+    esc_code(E2), append(E2, "0m", Post),
+    append(Pre, Text, P1), append(P1, Post, Colored).
+ansi_red(Text, Colored) :-
+    esc_code(E), append(E, "1;31m", Pre),
+    esc_code(E2), append(E2, "0m", Post),
+    append(Pre, Text, P1), append(P1, Post, Colored).
+ansi_yellow(Text, Colored) :-
+    esc_code(E), append(E, "1;35m", Pre),
+    esc_code(E2), append(E2, "0m", Post),
+    append(Pre, Text, P1), append(P1, Post, Colored).
+
 %% dead code warnings to stderr
 warn_dead_code([]).
 warn_dead_code([Name|Rest]) :-
     atom_chars(Name, NameChars),
-    append("warning: unused function '", NameChars, P1),
-    append(P1, "'\n", Msg),
+    ansi_yellow("warning:", WarnTag),
+    ansi_bold(NameChars, BoldName),
+    append(WarnTag, " unused function '", P1),
+    append(P1, BoldName, P2),
+    append(P2, "'\n", Msg),
+    write_stderr(Msg),
+    warn_dead_code(Rest).
+
+%% format effect errors to stdout
+format_effect_errors([]).
+format_effect_errors([effect_mismatch(Name, Decl, Inferred, Loc)|Rest]) :-
+    atom_chars(Name, NameCs),
+    atom_chars(Decl, DeclCs),
+    atom_chars(Inferred, InfCs),
+    format_loc(Loc, LocCs),
+    ansi_bold(LocCs, BoldLoc),
+    ansi_red("error:", ErrTag),
+    ansi_bold(NameCs, BoldName),
+    append(BoldLoc, ErrTag, P1),
+    append(P1, " '", P2),
+    append(P2, BoldName, P3),
+    append(P3, "' declared [", P4),
+    append(P4, DeclCs, P5),
+    append(P5, "] but inferred ", P6),
+    append(P6, InfCs, P7),
+    append(P7, "\n", Msg),
+    maplist(put_char, Msg),
+    format_effect_errors(Rest).
+
+format_loc(loc(L, C), Cs) :-
+    number_chars(L, LCs),
+    number_chars(C, CCs),
+    append(LCs, ":", P1),
+    append(P1, CCs, P2),
+    append(P2, ": ", Cs).
+format_loc(loc(File, L, C), Cs) :-
+    atom_chars(File, FCs),
+    number_chars(L, LCs),
+    number_chars(C, CCs),
+    append(FCs, ":", P1),
+    append(P1, LCs, P2),
+    append(P2, ":", P3),
+    append(P3, CCs, P4),
+    append(P4, ": ", Cs).
+format_loc(unknown, "").
+
+write_stderr(Msg) :-
     current_output(StdOut),
     open('/dev/stderr', write, Err),
     set_output(Err),
     maplist(put_char, Msg),
     close(Err),
-    set_output(StdOut),
-    warn_dead_code(Rest).
+    set_output(StdOut).
 
 read_source(File, Chars) :-
     open(File, read, S),
     get_chars(S, Chars),
     close(S).
+
+%% compute_def_lines(+SourceChars, -Map)
+%% Map = [Name-loc(Line,Col), ...] for each (def Name ...) found in source.
+compute_def_lines(Source, Map) :-
+    def_lines_(Source, 1, 1, Map).
+
+%% compute_def_lines_file(+SourceChars, +FileName, -Map)
+%% Map = [Name-loc(File,Line,Col), ...] with filename.
+compute_def_lines_file(Source, File, Map) :-
+    def_lines_file_(Source, File, 1, 1, Map).
+
+def_lines_file_([], _, _, _, []).
+def_lines_file_(['\n'|Cs], F, L, _, Map) :-
+    !, L1 is L + 1,
+    def_lines_file_(Cs, F, L1, 1, Map).
+def_lines_file_([';'|Cs], F, L, Col, Map) :-
+    !, skip_comment(Cs, Rest),
+    def_lines_file_(Rest, F, L, Col, Map).
+def_lines_file_(['(', 'd', 'e', 'f', ' '|Cs], F, L, Col, [Name-loc(F,L,Col)|Map]) :-
+    !,
+    scan_def_name(Cs, NameCs, Rest),
+    atom_chars(Name, NameCs),
+    length(['(','d','e','f',' '|NameCs], Skip),
+    Col1 is Col + Skip,
+    def_lines_file_(Rest, F, L, Col1, Map).
+def_lines_file_([_|Cs], F, L, Col, Map) :-
+    Col1 is Col + 1,
+    def_lines_file_(Cs, F, L, Col1, Map).
+
+def_lines_([], _, _, []).
+def_lines_(['\n'|Cs], L, _, Map) :-
+    !, L1 is L + 1,
+    def_lines_(Cs, L1, 1, Map).
+def_lines_([';'|Cs], L, Col, Map) :-
+    !, skip_comment(Cs, Rest),
+    def_lines_(Rest, L, Col, Map).
+def_lines_(['(', 'd', 'e', 'f', ' '|Cs], L, Col, [Name-loc(L,Col)|Map]) :-
+    !,
+    scan_def_name(Cs, NameCs, Rest),
+    atom_chars(Name, NameCs),
+    length(['(','d','e','f',' '|NameCs], Skip),
+    Col1 is Col + Skip,
+    def_lines_(Rest, L, Col1, Map).
+def_lines_([_|Cs], L, Col, Map) :-
+    Col1 is Col + 1,
+    def_lines_(Cs, L, Col1, Map).
+
+scan_def_name([C|Cs], [C|Rest], Tail) :-
+    C \= ' ', C \= '\n', C \= '\t', C \= '(', C \= ')',
+    !,
+    scan_def_name(Cs, Rest, Tail).
+scan_def_name(Cs, [], Cs).
+
+skip_comment(['\n'|Cs], ['\n'|Cs]) :- !.
+skip_comment([_|Cs], Rest) :- !, skip_comment(Cs, Rest).
+skip_comment([], []).
 
 get_chars(S, Chars) :-
     get_char(S, C),
