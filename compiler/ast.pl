@@ -116,9 +116,9 @@ transform_binding(list([sym(Name), Expr]), bind(Name, TE)) :-
     transform(Expr, TE).
 
 %% parse optional effect annotation from body forms
-parse_optional_effect([sym(det) | Rest], det, Rest) :- Rest \= [].
-parse_optional_effect([sym(semidet) | Rest], semidet, Rest) :- Rest \= [].
-parse_optional_effect([sym(nondet) | Rest], nondet, Rest) :- Rest \= [].
+parse_optional_effect([bracket([sym(det)]) | Rest], det, Rest) :- Rest \= [].
+parse_optional_effect([bracket([sym(semidet)]) | Rest], semidet, Rest) :- Rest \= [].
+parse_optional_effect([bracket([sym(nondet)]) | Rest], nondet, Rest) :- Rest \= [].
 parse_optional_effect(Body, none, Body).
 
 transform_type(sym(int), int).
