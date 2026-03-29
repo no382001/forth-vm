@@ -1,0 +1,135 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Sets",
+  "scopeName": "source.sets",
+  "patterns": [
+    { "include": "#comment" },
+    { "include": "#string" },
+    { "include": "#effect-annotation" },
+    { "include": "#meta-directive" },
+    { "include": "#constant-number" },
+    { "include": "#definition" },
+    { "include": "#const-decl" },
+    { "include": "#include-decl" },
+    { "include": "#extern-decl" },
+    { "include": "#type-annotation" },
+    { "include": "#keyword" },
+    { "include": "#builtin" },
+    { "include": "#operator" },
+    { "include": "#type" },
+    { "include": "#number" },
+    { "include": "#boolean" }
+  ],
+  "repository": {
+    "comment": {
+      "match": ";.*$",
+      "name": "comment.line.semicolon.sets"
+    },
+    "string": {
+      "begin": "\"",
+      "end": "\"",
+      "name": "string.quoted.double.sets"
+    },
+    "effect-annotation": {
+      "match": "\\[(det|semidet|nondet)\\]",
+      "name": "storage.modifier.effect.sets",
+      "captures": {
+        "1": { "name": "storage.modifier.effect.sets" }
+      }
+    },
+    "meta-directive": {
+      "patterns": [
+        {
+          "match": "(\\()(\\$(?:section|alloc))\\b",
+          "captures": {
+            "1": { "name": "punctuation.paren.open.sets" },
+            "2": { "name": "keyword.other.meta.sets" }
+          }
+        },
+        {
+          "match": "(\\()(\\$(?:vm-sp|vm-rp|vm-ip|cell|mem|stack-size|ds-start|rs-start))(\\))",
+          "captures": {
+            "1": { "name": "punctuation.paren.open.sets" },
+            "2": { "name": "constant.language.meta.sets" },
+            "3": { "name": "punctuation.paren.close.sets" }
+          }
+        }
+      ]
+    },
+    "definition": {
+      "match": "(\\()(def)\\s+([a-zA-Z_][a-zA-Z0-9_-]*)",
+      "captures": {
+        "1": { "name": "punctuation.paren.open.sets" },
+        "2": { "name": "keyword.control.def.sets" },
+        "3": { "name": "entity.name.function.sets" }
+      }
+    },
+    "const-decl": {
+      "match": "(\\()(const)\\s+([a-zA-Z_][a-zA-Z0-9_-]*)",
+      "captures": {
+        "1": { "name": "punctuation.paren.open.sets" },
+        "2": { "name": "keyword.control.const.sets" },
+        "3": { "name": "variable.other.constant.sets" }
+      }
+    },
+    "include-decl": {
+      "match": "(\\()(include)\\s",
+      "captures": {
+        "1": { "name": "punctuation.paren.open.sets" },
+        "2": { "name": "keyword.control.include.sets" }
+      }
+    },
+    "extern-decl": {
+      "match": "(\\()(extern)\\s+([a-zA-Z_][a-zA-Z0-9_-]*)",
+      "captures": {
+        "1": { "name": "punctuation.paren.open.sets" },
+        "2": { "name": "keyword.control.extern.sets" },
+        "3": { "name": "entity.name.function.extern.sets" }
+      }
+    },
+    "type-annotation": {
+      "match": ":\\s+(int|byte|bool|void|\\(ptr\\s+(?:int|byte|bool)\\))",
+      "captures": {
+        "1": { "name": "support.type.sets" }
+      }
+    },
+    "keyword": {
+      "match": "(?<=\\()\\s*(if|let|while|do)\\b",
+      "captures": {
+        "1": { "name": "keyword.control.sets" }
+      }
+    },
+    "builtin": {
+      "match": "(?<=\\()\\s*(emit|key|bye|deref|deref8|store|store8|addr|execute|assert-fail)\\b",
+      "captures": {
+        "1": { "name": "support.function.builtin.sets" }
+      }
+    },
+    "operator": {
+      "match": "(?<=\\()\\s*(\\+|-|\\*|<|>|=|!=|<=|>=|and|or|xor)(?=\\s)",
+      "captures": {
+        "1": { "name": "keyword.operator.sets" }
+      }
+    },
+    "type": {
+      "match": "\\b(int|byte|bool|void|ptr)\\b",
+      "name": "support.type.sets"
+    },
+    "number": {
+      "match": "(?<=[\\s(\\[])(-?[0-9]+)(?=[\\s)\\]])",
+      "captures": {
+        "1": { "name": "constant.numeric.integer.sets" }
+      }
+    },
+    "constant-number": {
+      "match": "(?<=[\\s(])([A-Z][A-Z0-9_]*)(?=[\\s)])",
+      "captures": {
+        "1": { "name": "variable.other.constant.sets" }
+      }
+    },
+    "boolean": {
+      "match": "\\b(true|false)\\b",
+      "name": "constant.language.boolean.sets"
+    }
+  }
+}
