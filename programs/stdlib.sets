@@ -10,7 +10,7 @@
 ($alloc CF_SP   2)    ; catch frame stack pointer (byte offset)
 ($alloc CF_BASE 32)   ; catch frame stack (8 frames)
 
-(def catch_init () : void
+(def catch_init () : void semidet
   (store CF_SP 0)
   (store THROWN 0))
 
@@ -18,19 +18,19 @@
 ;; We save RP-1 (skipping catch_push's own return addr slot) so that
 ;; when throw restores RP and RETs, it pops the *caller's* return addr,
 ;; effectively returning from the function that called catch_push.
-(def catch_push () : void
+(def catch_push () : void semidet
   (let ((off (deref CF_SP)))
     (store (+ CF_BASE off) (- (deref VM_RP) 1))
     (store (+ CF_BASE (+ off 2)) (deref DSP))
     (store CF_SP (+ off 4))))
 
 ;; pop a catch frame (normal return path)
-(def catch_pop () : void
+(def catch_pop () : void semidet
   (store CF_SP (- (deref CF_SP) 4)))
 
 ;; throw — restore state to most recent catch frame and unwind
 ;; ( error-code -- )
-(def f_throw () : void
+(def f_throw () : void nondet
   (let ((code (ds_pop)))
     (if (= (deref CF_SP) 0)
       ;; no catch frame: print error and abort

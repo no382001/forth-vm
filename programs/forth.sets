@@ -58,9 +58,9 @@
 ;; arithmetic helpers (no hw multiply/divide)
 ;; ============================================================
 
-;; multiply: no hw instruction
-
-(def mul ((a : int) (b : int)) : int
+;; multiply via repeated addition
+;; uses: REM, DENOM, SIGN, QUOT
+(def mul ((a : int) (b : int)) : int semidet
   (store SIGN 1)
   (if (< a 0) (do (store SIGN (- 0 (deref SIGN))) (store REM (- 0 a))) (store REM a))
   (if (< b 0) (do (store SIGN (- 0 (deref SIGN))) (store DENOM (- 0 b))) (store DENOM b))
@@ -70,9 +70,10 @@
     (store DENOM (- (deref DENOM) 1)))
   (if (< (deref SIGN) 0) (- 0 (deref QUOT)) (deref QUOT)))
 
-;; divide: no hw instruction
-
-(def divmod ((a : int) (b : int)) : int
+;; integer division via repeated subtraction
+;; returns quotient; remainder available as (deref REM) after call
+;; uses: REM (remainder), DENOM, SIGN, QUOT (quotient)
+(def divmod ((a : int) (b : int)) : int semidet
   (store SIGN 1)
   (if (< a 0) (do (store SIGN (- 0 (deref SIGN))) (store REM (- 0 a))) (store REM a))
   (if (< b 0) (do (store SIGN (- 0 (deref SIGN))) (store DENOM (- 0 b))) (store DENOM b))
@@ -86,7 +87,7 @@
 ;; string utilities
 ;; ============================================================
 
-(def streq ((a : (ptr byte)) (b : (ptr byte))) : bool
+(def streq ((a : (ptr byte)) (b : (ptr byte))) : bool semidet
   (store STRI 0)
   (while (if (= (deref8 (+ a (deref STRI))) (deref8 (+ b (deref STRI))))
            (!= (deref8 (+ a (deref STRI))) 0)
@@ -94,15 +95,15 @@
     (store STRI (+ (deref STRI) 1)))
   (= (deref8 (+ a (deref STRI))) (deref8 (+ b (deref STRI)))))
 
-(def print_str ((s : (ptr byte))) : void
+(def print_str ((s : (ptr byte))) : void nondet
   (store PRINTI 0)
   (while (!= (deref8 (+ s (deref PRINTI))) 0)
     (emit (deref8 (+ s (deref PRINTI))))
     (store PRINTI (+ (deref PRINTI) 1))))
 
 ;; print a signed integer in decimal
-
-(def print_num ((n : int)) : void
+;; uses: PN_VAL, PN_IDX, PN_BUF; calls divmod (which uses REM-QUOT)
+(def print_num ((n : int)) : void nondet
   (if (= n 0)
     (emit 48)
     (do
@@ -126,11 +127,11 @@
 ;; dictionary
 ;; ============================================================
 
-(def dict_init () : void
+(def dict_init () : void semidet
   (store LATEST 0)
   (store HERE HEAP))
 
-(def dict_add ((name : (ptr byte)) (xt : int)) : void
+(def dict_add ((name : (ptr byte)) (xt : int)) : void semidet
   (let ((h (deref HERE)))
     
     (store NAMEI 0)
@@ -146,7 +147,7 @@
     
     (store HERE (+ (+ h 7) (deref NAMEI)))))
 
-(def dict_find ((name : (ptr byte))) : int
+(def dict_find ((name : (ptr byte))) : int semidet
   (store WALKER (deref LATEST))
   (store FOUND 0)
   (while (if (!= (deref WALKER) 0) (= (deref FOUND) 0) (< 1 0))
@@ -155,7 +156,7 @@
       (store WALKER (deref (deref WALKER)))))
   (deref FOUND))
 
-(def dict_words () : void
+(def dict_words () : void nondet
   (store ITER (deref LATEST))
   (while (!= (deref ITER) 0)
     (print_str (deref (+ (deref ITER) 2)))
@@ -167,21 +168,22 @@
 ;; Forth data stack
 ;; ============================================================
 
-(def ds_init () : void
+(def ds_init () : void semidet
   (store DSP DSB))
 
-(def ds_push ((v : int)) : void
+(def ds_push ((v : int)) : void semidet
   (store (deref DSP) v)
   (store DSP (+ (deref DSP) 2)))
 
-(def ds_pop () : int
+(def ds_pop () : int semidet
   (store DSP (- (deref DSP) 2))
   (deref (deref DSP)))
 
-(def ds_depth () : int
+(def ds_depth () : int semidet
   (divmod (- (deref DSP) DSB) 2))
 
-(def ds_show () : void
+;; print stack contents: <n> elem1 elem2 ... top
+(def ds_show () : void nondet
   (emit 60)
   (print_num (ds_depth))
   (emit 62)
@@ -196,7 +198,8 @@
 ;; input
 ;; ============================================================
 
-(def read_line () : int
+;; read a line into LBUF, null-terminate, return length (-1 on EOF)
+(def read_line () : int nondet
   (store ITER 0)
   (while (do (store CHAR (key))
              (if (= (deref CHAR) -1) (< 1 0)
@@ -212,11 +215,13 @@
 ;; tokenizer — walk LBUF extracting space-delimited words
 ;; ============================================================
 
-(def tok_init () : void
+(def tok_init () : void semidet
   (store LPOS 0))
 
-(def tok_next () : int
-  
+;; skip spaces, copy next word into WBUF, null-terminate
+;; returns word length (0 = end of line)
+(def tok_next () : int semidet
+  ;; skip spaces
   (while (= (deref8 (+ LBUF (deref LPOS))) 32)
     (store LPOS (+ (deref LPOS) 1)))
   
@@ -238,7 +243,10 @@
 ;; number parsing
 ;; ============================================================
 
-(def parse_num () : bool
+;; try to parse WBUF as a signed decimal integer
+;; returns true if success (result in PN_ACC), false if not a number
+;; uses: PN_POS, PN_SIGN, PN_ACC, PN_OK; calls mul
+(def parse_num () : bool semidet
   (store PN_POS 0)
   (store PN_SIGN 1)
   (store PN_ACC 0)
@@ -269,12 +277,12 @@
 ;; ============================================================
 
 ;; emit a cell to HERE, advance HERE by 2
-(def emit_cell ((v : int)) : void
+(def emit_cell ((v : int)) : void semidet
   (store (deref HERE) v)
   (store HERE (+ (deref HERE) 2)))
 
 ;; copy WBUF to CNAME
-(def save_name () : void
+(def save_name () : void semidet
   (store STRI 0)
   (while (!= (deref8 (+ WBUF (deref STRI))) 0)
     (store8 (+ CNAME (deref STRI)) (deref8 (+ WBUF (deref STRI))))
@@ -282,100 +290,100 @@
   (store8 (+ CNAME (deref STRI)) 0))
 
 ;; : — start a colon definition
-(def f_colon () : void
+(def f_colon () : void semidet
   (tok_next)        ; read name token
   (save_name)       ; save it
   (store CSTART (deref HERE))  ; mark code start
   (store STATE 1))  ; enter compile mode
 
 ;; ; — end a colon definition (immediate)
-(def f_semi () : void
+(def f_semi () : void semidet
   (emit_cell 23)    ; emit RET opcode
   (dict_add CNAME (deref CSTART))
   (store STATE 0))  ; back to interpret mode
 
-(def f_dot () : void
+(def f_dot () : void nondet
   (print_num (ds_pop)) (emit 32))
 
-(def f_add () : void
+(def f_add () : void semidet
   (let ((b (ds_pop))) (ds_push (+ (ds_pop) b))))
 
-(def f_sub () : void
+(def f_sub () : void semidet
   (let ((b (ds_pop))) (ds_push (- (ds_pop) b))))
 
-(def f_mul () : void
+(def f_mul () : void semidet
   (let ((b (ds_pop))) (ds_push (mul (ds_pop) b))))
 
-(def f_div () : void
+(def f_div () : void semidet
   (let ((b (ds_pop))) (ds_push (divmod (ds_pop) b))))
 
-(def f_mod () : void
+(def f_mod () : void semidet
   (let ((b (ds_pop)))
     (let ((a (ds_pop)))
       (divmod a b) (ds_push (deref REM)))))
 
-(def f_dup () : void
+(def f_dup () : void semidet
   (let ((a (ds_pop))) (ds_push a) (ds_push a)))
 
-(def f_swap () : void
+(def f_swap () : void semidet
   (let ((b (ds_pop))) (let ((a (ds_pop))) (ds_push b) (ds_push a))))
 
-(def f_drop () : void
+(def f_drop () : void semidet
   (ds_pop) (store ITER 0))
 
-(def f_over () : void
+(def f_over () : void semidet
   (let ((b (ds_pop))) (let ((a (ds_pop))) (ds_push a) (ds_push b) (ds_push a))))
 
-(def f_eq () : void
+(def f_eq () : void semidet
   (let ((b (ds_pop))) (if (= (ds_pop) b) (ds_push -1) (ds_push 0))))
 
-(def f_lt () : void
+(def f_lt () : void semidet
   (let ((b (ds_pop))) (if (< (ds_pop) b) (ds_push -1) (ds_push 0))))
 
-(def f_gt () : void
+(def f_gt () : void semidet
   (let ((b (ds_pop))) (if (< b (ds_pop)) (ds_push -1) (ds_push 0))))
 
-(def f_zeq () : void
+(def f_zeq () : void semidet
   (if (= (ds_pop) 0) (ds_push -1) (ds_push 0)))
 
-(def f_negate () : void
+(def f_negate () : void semidet
   (ds_push (- 0 (ds_pop))))
 
-(def f_abs () : void
+(def f_abs () : void semidet
   (let ((a (ds_pop))) (if (< a 0) (ds_push (- 0 a)) (ds_push a))))
 
-(def f_max () : void
+(def f_max () : void semidet
   (let ((b (ds_pop))) (let ((a (ds_pop))) (if (< a b) (ds_push b) (ds_push a)))))
 
-(def f_dot_s () : void
+(def f_dot_s () : void nondet
   (ds_show))
 
-(def f_cr () : void
+(def f_cr () : void nondet
   (emit 10))
 
-(def f_emit () : void
+(def f_emit () : void nondet
   (emit (ds_pop)))
 
-(def f_and () : void
+(def f_and () : void semidet
   (let ((b (ds_pop))) (ds_push (and (ds_pop) b))))
 
-(def f_or () : void
+(def f_or () : void semidet
   (let ((b (ds_pop))) (ds_push (or (ds_pop) b))))
 
-(def f_xor () : void
+(def f_xor () : void semidet
   (let ((b (ds_pop))) (ds_push (xor (ds_pop) b))))
 
-(def f_words () : void
+(def f_words () : void nondet
   (dict_words))
 
-(def f_bye () : void
+(def f_bye () : void nondet
   (bye))
 
 ;; ============================================================
 ;; interpret one word (in WBUF)
 ;; ============================================================
 
-(def interpret_word () : void
+(def interpret_word () : void nondet
   (if (= (deref STATE) 0)
     ;; --- interpret mode ---
     (let ((xt (dict_find WBUF)))
@@ -397,7 +405,7 @@
 
 ;; run all tokens on a line, wrapped in catch
 ;; catch_push saves RP here; if throw fires, we return from run_line early
-(def run_line () : void
+(def run_line () : void nondet
   (catch_push)
   (tok_init)
   (while (< 0 (tok_next))
@@ -408,7 +416,7 @@
 ;; main
 ;; ============================================================
 
-(def main () : void
+(def main () : void nondet
   (dict_init)
   (ds_init)
   (catch_init)
