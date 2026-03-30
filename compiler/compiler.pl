@@ -291,58 +291,48 @@ read_source(File, Chars) :-
 %% compute_def_lines(+SourceChars, -Map)
 %% Map = [Name-loc(Line,Col), ...] for each (def Name ...) found in source.
 compute_def_lines(Source, Map) :-
-    def_lines_(Source, 1, 1, Map).
+    phrase(def_lines_(1, 1, Map), Source).
 
 %% compute_def_lines_file(+SourceChars, +FileName, -Map)
 %% Map = [Name-loc(File,Line,Col), ...] with filename.
 compute_def_lines_file(Source, File, Map) :-
-    def_lines_file_(Source, File, 1, 1, Map).
+    phrase(def_lines_file_(File, 1, 1, Map), Source).
 
-def_lines_file_([], _, _, _, []).
-def_lines_file_(['\n'|Cs], F, L, _, Map) :-
-    !, L1 is L + 1,
-    def_lines_file_(Cs, F, L1, 1, Map).
-def_lines_file_([';'|Cs], F, L, Col, Map) :-
-    !, skip_comment(Cs, Rest),
-    def_lines_file_(Rest, F, L, Col, Map).
-def_lines_file_(['(', 'd', 'e', 'f', ' '|Cs], F, L, Col, [Name-loc(F,L,Col)|Map]) :-
-    !,
-    scan_def_name(Cs, NameCs, Rest),
-    atom_chars(Name, NameCs),
-    length(['(','d','e','f',' '|NameCs], Skip),
-    Col1 is Col + Skip,
-    def_lines_file_(Rest, F, L, Col1, Map).
-def_lines_file_([_|Cs], F, L, Col, Map) :-
-    Col1 is Col + 1,
-    def_lines_file_(Cs, F, L, Col1, Map).
+def_lines_file_(F, L, _, Map) --> ['\n'], !, { L1 is L+1 },
+    def_lines_file_(F, L1, 1, Map).
+def_lines_file_(F, L, Col, Map) --> [';'], !, skip_comment,
+    def_lines_file_(F, L, Col, Map).
+def_lines_file_(F, L, Col, [Name-loc(F,L,Col)|Map]) -->
+    "(def ", !, scan_def_name(NameCs),
+    { atom_chars(Name, NameCs),
+      length(['(','d','e','f',' '|NameCs], Skip),
+      Col1 is Col + Skip },
+    def_lines_file_(F, L, Col1, Map).
+def_lines_file_(F, L, Col, Map) --> [_], !, { Col1 is Col+1 },
+    def_lines_file_(F, L, Col1, Map).
+def_lines_file_(_, _, _, []) --> [].
 
-def_lines_([], _, _, []).
-def_lines_(['\n'|Cs], L, _, Map) :-
-    !, L1 is L + 1,
-    def_lines_(Cs, L1, 1, Map).
-def_lines_([';'|Cs], L, Col, Map) :-
-    !, skip_comment(Cs, Rest),
-    def_lines_(Rest, L, Col, Map).
-def_lines_(['(', 'd', 'e', 'f', ' '|Cs], L, Col, [Name-loc(L,Col)|Map]) :-
-    !,
-    scan_def_name(Cs, NameCs, Rest),
-    atom_chars(Name, NameCs),
-    length(['(','d','e','f',' '|NameCs], Skip),
-    Col1 is Col + Skip,
-    def_lines_(Rest, L, Col1, Map).
-def_lines_([_|Cs], L, Col, Map) :-
-    Col1 is Col + 1,
-    def_lines_(Cs, L, Col1, Map).
+def_lines_(L, _, Map) --> ['\n'], !, { L1 is L+1 },
+    def_lines_(L1, 1, Map).
+def_lines_(L, Col, Map) --> [';'], !, skip_comment,
+    def_lines_(L, Col, Map).
+def_lines_(L, Col, [Name-loc(L,Col)|Map]) -->
+    "(def ", !, scan_def_name(NameCs),
+    { atom_chars(Name, NameCs),
+      length(['(','d','e','f',' '|NameCs], Skip),
+      Col1 is Col + Skip },
+    def_lines_(L, Col1, Map).
+def_lines_(L, Col, Map) --> [_], !, { Col1 is Col+1 },
+    def_lines_(L, Col1, Map).
+def_lines_(_, _, []) --> [].
 
-scan_def_name([C|Cs], [C|Rest], Tail) :-
-    C \= ' ', C \= '\n', C \= '\t', C \= '(', C \= ')',
-    !,
-    scan_def_name(Cs, Rest, Tail).
-scan_def_name(Cs, [], Cs).
+scan_def_name([C|Rest]) --> [C],
+    { C \= ' ', C \= '\n', C \= '\t', C \= '(', C \= ')' }, !,
+    scan_def_name(Rest).
+scan_def_name([]) --> [].
 
-skip_comment(['\n'|Cs], ['\n'|Cs]) :- !.
-skip_comment([_|Cs], Rest) :- !, skip_comment(Cs, Rest).
-skip_comment([], []).
+skip_comment --> [C], { C \= '\n' }, !, skip_comment.
+skip_comment --> [].
 
 get_chars(S, Chars) :-
     get_char(S, C),

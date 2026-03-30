@@ -31,21 +31,17 @@ collect_defined([extern(_, _, _)|Rest], Names) :-
 %% collect all referenced names (calls + addr)
 %% ============================================================
 
-collect_referenced([], []).
-collect_referenced([def(_, _, _, _, Body)|Rest], Refs) :-
-    body_refs(Body, BodyRefs),
-    collect_referenced(Rest, RestRefs),
-    append(BodyRefs, RestRefs, Refs).
-collect_referenced([const(_, _, _)|Rest], Refs) :-
-    collect_referenced(Rest, Refs).
-collect_referenced([extern(_, _, _)|Rest], Refs) :-
-    collect_referenced(Rest, Refs).
+collect_referenced(Defs, Refs) :-
+    maplist(def_body_refs, Defs, AllRefs),
+    append(AllRefs, Refs).
 
-body_refs([], []).
-body_refs([E|Es], Refs) :-
-    expr_refs(E, ERefs),
-    body_refs(Es, RestRefs),
-    append(ERefs, RestRefs, Refs).
+def_body_refs(def(_, _, _, _, Body), Refs) :- body_refs(Body, Refs).
+def_body_refs(const(_, _, _), []).
+def_body_refs(extern(_, _, _), []).
+
+body_refs(Exprs, Refs) :-
+    maplist(expr_refs, Exprs, AllRefs),
+    append(AllRefs, Refs).
 
 expr_refs(num(_), []).
 expr_refs(str(_), []).
@@ -85,14 +81,12 @@ expr_refs(while(Cond, Body), Refs) :-
 expr_refs(call(Name, Args), [Name|ArgRefs]) :-
     args_refs(Args, ArgRefs).
 
-bindings_refs([], []).
-bindings_refs([bind(_, Expr)|Rest], Refs) :-
-    expr_refs(Expr, ER),
-    bindings_refs(Rest, RR),
-    append(ER, RR, Refs).
+bindings_refs(Bindings, Refs) :-
+    maplist(binding_refs, Bindings, AllRefs),
+    append(AllRefs, Refs).
 
-args_refs([], []).
-args_refs([A|As], Refs) :-
-    expr_refs(A, AR),
-    args_refs(As, RR),
-    append(AR, RR, Refs).
+binding_refs(bind(_, Expr), Refs) :- expr_refs(Expr, Refs).
+
+args_refs(Args, Refs) :-
+    maplist(expr_refs, Args, AllRefs),
+    append(AllRefs, Refs).

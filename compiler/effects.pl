@@ -153,23 +153,20 @@ builtin_effect('assert-fail', nondet).
 %% helpers
 %% ============================================================
 
-infer_body_effect([], _, det).
-infer_body_effect([E|Es], Env, Eff) :-
-    infer_expr_effect(E, Env, EE),
-    infer_body_effect(Es, Env, ERest),
-    effect_join(EE, ERest, Eff).
+infer_expr_eff(Env, Expr, Eff) :- infer_expr_effect(Expr, Env, Eff).
+infer_binding_eff(Env, bind(_, Expr), Eff) :- infer_expr_effect(Expr, Env, Eff).
 
-infer_args_effect([], _, det).
-infer_args_effect([A|As], Env, Eff) :-
-    infer_expr_effect(A, Env, EA),
-    infer_args_effect(As, Env, ERest),
-    effect_join(EA, ERest, Eff).
+infer_body_effect(Exprs, Env, Eff) :-
+    maplist(infer_expr_eff(Env), Exprs, Effs),
+    effect_join_list(Effs, Eff).
 
-infer_bindings_effect([], _, det).
-infer_bindings_effect([bind(_, Expr)|Rest], Env, Eff) :-
-    infer_expr_effect(Expr, Env, EE),
-    infer_bindings_effect(Rest, Env, ERest),
-    effect_join(EE, ERest, Eff).
+infer_args_effect(Args, Env, Eff) :-
+    maplist(infer_expr_eff(Env), Args, Effs),
+    effect_join_list(Effs, Eff).
+
+infer_bindings_effect(Bindings, Env, Eff) :-
+    maplist(infer_binding_eff(Env), Bindings, Effs),
+    effect_join_list(Effs, Eff).
 
 %% ============================================================
 %% annotation checking
