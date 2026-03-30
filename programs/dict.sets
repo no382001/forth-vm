@@ -1,21 +1,24 @@
 ;; ---- scratch cells ----
-(const PRINTI int 32768)   ; print_str index
-(const WALKER int 32770)   ; dict_find: entry walker
-(const FOUND  int 32772)   ; dict_find: result
-(const LINEI  int 32774)   ; read_line: index
-(const STRI   int 32776)   ; streq: counter
-(const ITER   int 32778)   ; dict_words: entry walker
-(const CHAR   int 32780)   ; current input char
+($section 32768)
+($alloc PRINTI 2)   ; print_str index
+($alloc WALKER 2)   ; dict_find: entry walker
+($alloc FOUND  2)   ; dict_find: result
+($alloc LINEI  2)   ; read_line: index
+($alloc STRI   2)   ; streq: counter
+($alloc ITER   2)   ; dict_words: entry walker
+($alloc CHAR   2)   ; current input char
 
 ;; ---- dictionary state ----
-(const LATEST int 32790)
-(const HERE   int 32792)
+($alloc LATEST 2)
+($alloc HERE   2)
 
 ;; ---- I/O ----
-(const BUF int 33000)
+($section 33000)
+($alloc BUF 256)
 
 ;; ---- heap ----
-(const HEAP int 35000)
+($section 35000)
+($alloc HEAP 0)
 
 ;; ============================================================
 ;; string utilities
