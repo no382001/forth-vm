@@ -99,6 +99,10 @@ transform(list([sym(Op), A, B]), binop(Op, TA, TB)) :-
     transform(A, TA),
     transform(B, TB).
 
+%% {op op ...} — inline VM ops, bypasses type system
+transform(asm(Syms), inline(Ops)) :-
+    syms_to_names(Syms, Ops).
+
 %% function call (anything else that's a list with a sym head)
 transform(list([sym(Name) | Args]), call(Name, TArgs)) :-
     \+ reserved(Name),
@@ -138,3 +142,7 @@ reserved(while). reserved(const). reserved(extern).
 reserved(deref). reserved(store). reserved(store8).
 reserved(addr). reserved(execute). reserved(deref8).
 reserved(include).
+
+syms_to_names([], []).
+syms_to_names([sym(S)|Rest], [S|Names]) :-
+    syms_to_names(Rest, Names).

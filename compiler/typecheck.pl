@@ -185,6 +185,10 @@ infer(Env, FEnv, execute(E), void) :-
     infer(Env, FEnv, E, ET),
     numeric_type(ET).
 
+%% inline VM ops: escape hatch, typed as int; validates each op name
+infer(_, _, inline(Ops), int) :-
+    all_known_vm_ops(Ops).
+
 %% function call
 infer(Env, FEnv, call(Name, Args), RetType) :-
     member(func(Name, ParamTypes, RetType), FEnv),
@@ -243,6 +247,15 @@ types_compatible(ptr(_), int) :- !.
 numeric_type(int).
 numeric_type(byte).
 numeric_type(ptr(_)).
+
+all_known_vm_ops([]).
+all_known_vm_ops([Op|Ops]) :-
+    ( gen:op(Op, Opcode, _, _, _, _), number(Opcode) ->
+        true
+    ;
+        throw(error(unknown_vm_op(Op), context(inline/0, 'unknown VM op')))
+    ),
+    all_known_vm_ops(Ops).
 
 %% ============================================================
 %% test helper: parse -> ast -> typecheck pipeline

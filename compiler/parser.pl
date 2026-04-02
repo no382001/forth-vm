@@ -29,6 +29,7 @@ program([]) --> ws.
 
 form(list(Elems))    --> ['('], !, ws, list_elems(Elems), ws, [')'].
 form(bracket(Elems)) --> ['['], !, ws, list_elems(Elems), ws, [']'].
+form(asm(Elems))     --> ['{'], !, ws, list_elems(Elems), ws, ['}'].
 form(str(Cs))        --> ['"'], !, string_content(Cs), ['"'].
 form(num(N))         --> num_chars(Ds), { Ds = [_|_], !, number_chars(N, Ds) }.
 form(sym(A))         --> sym_chars(Cs), { Cs = [_|_], atom_chars(A, Cs) }.
@@ -60,7 +61,7 @@ sym_chars([C|Cs]) --> [C], { sym_char(C) }, !, sym_chars(Cs).
 sym_chars([]) --> [].
 
 sym_char(C) :-
-    \+ member(C, [' ', '\n', '\t', '\r', '(', ')', '[', ']', '"', ';']).
+    \+ member(C, [' ', '\n', '\t', '\r', '(', ')', '[', ']', '{', '}', '"', ';']).
 
 %% ============================================================
 %% string literals

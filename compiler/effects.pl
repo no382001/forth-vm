@@ -99,6 +99,9 @@ infer_expr_effect(execute(E), Env, Eff) :-
 %% addr -> det (just gets an address, no side effect)
 infer_expr_effect(addr(_), _, det).
 
+%% inline VM ops: conservative nondet
+infer_expr_effect(inline(_), _, nondet).
+
 %% binary ops -> det + children
 infer_expr_effect(binop(_, A, B), Env, Eff) :-
     infer_expr_effect(A, Env, EA),

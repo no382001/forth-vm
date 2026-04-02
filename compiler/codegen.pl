@@ -197,6 +197,10 @@ compile_expr(store8(Addr, Val), Env, Consts, LN0, Code, LN) :-
     append(VC, AC, C1),
     append(C1, [op('c!')], Code).
 
+%% {op ...} — inline VM ops
+compile_expr(inline(Ops), _, _, LN, Code, LN) :-
+    ops_to_vm(Ops, Code).
+
 %% addr — push function address
 compile_expr(addr(Name), _, _, LN, [lit_label(Name)], LN).
 
@@ -217,6 +221,10 @@ compile_expr(call(Name, Args), Env, Consts, LN0, Code, LN) :-
 %% ============================================================
 %% helpers
 %% ============================================================
+
+ops_to_vm([], []).
+ops_to_vm([Op|Ops], [op(Op)|Code]) :-
+    ops_to_vm(Ops, Code).
 
 compile_args([], _, _, LN, [], LN).
 compile_args([A | As], Env, Consts, LN0, Code, LN) :-
