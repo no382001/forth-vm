@@ -117,7 +117,7 @@ infer(_, FEnv, var(Name), Type) :-
 
 %% binary arithmetic -> int
 infer(Env, FEnv, binop(Op, A, B), int) :-
-    member(Op, [+, -, *, 'and', 'or', 'xor']),
+    member(Op, [+, -, *, and, or, xor]),
     infer(Env, FEnv, A, AT),
     infer(Env, FEnv, B, BT),
     numeric_type(AT),
@@ -125,7 +125,7 @@ infer(Env, FEnv, binop(Op, A, B), int) :-
 
 %% comparison -> bool
 infer(Env, FEnv, binop(Op, A, B), bool) :-
-    member(Op, [=, <, >, '!=', '<=', '>=']),
+    member(Op, [=, <, >, '!=', <=, >=]),
     infer(Env, FEnv, A, AT),
     infer(Env, FEnv, B, BT),
     numeric_type(AT),

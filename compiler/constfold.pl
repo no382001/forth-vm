@@ -172,8 +172,8 @@ eval_binop(<, A, B, R) :- ( A < B -> R = 1 ; R = 0 ).
 eval_binop(>, A, B, R) :- ( A > B -> R = 1 ; R = 0 ).
 eval_binop(=, A, B, R) :- ( A =:= B -> R = 1 ; R = 0 ).
 eval_binop('!=', A, B, R) :- ( A =\= B -> R = 1 ; R = 0 ).
-eval_binop('<=', A, B, R) :- ( A =< B -> R = 1 ; R = 0 ).
-eval_binop('>=', A, B, R) :- ( A >= B -> R = 1 ; R = 0 ).
-eval_binop('and', A, B, R) :- R is A /\ B.
-eval_binop('or', A, B, R) :- R is A \/ B.
-eval_binop('xor', A, B, R) :- R is (A \/ B) /\ (\(A /\ B)).
+eval_binop(<=, A, B, R) :- ( A =< B -> R = 1 ; R = 0 ).
+eval_binop(>=, A, B, R) :- ( A >= B -> R = 1 ; R = 0 ).
+eval_binop(and, A, B, R) :- R is A /\ B.
+eval_binop(or, A, B, R) :- R is A \/ B.
+eval_binop(xor, A, B, R) :- R is (A \/ B) /\ (\(A /\ B)).

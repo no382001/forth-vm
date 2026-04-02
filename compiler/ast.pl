@@ -129,9 +129,9 @@ transform_type(list([sym(ptr), Inner]), ptr(T)) :-
     transform_type(Inner, T).
 
 binop(+). binop(-). binop(*).
-binop('and'). binop('or'). binop('xor').
+binop(and). binop(or). binop(xor).
 binop(=). binop(<). binop(>).
-binop('!='). binop('<='). binop('>=').
+binop('!='). binop(<=). binop(>=).
 
 reserved(def). reserved(let). reserved(if). reserved(do).
 reserved(while). reserved(const). reserved(extern).

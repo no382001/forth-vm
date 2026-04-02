@@ -76,7 +76,7 @@ alloc_params([param(Name, _Type) | Rest], Slot, [var(Name, Slot) | Env], SlotOut
 prologue([], []).
 prologue([var(_, Addr) | Rest], Code) :-
     prologue(Rest, RestCode),
-    append([lit(Addr), op('!')], RestCode, Code).
+    append([lit(Addr), op(!)], RestCode, Code).
 
 %% ============================================================
 %% body: list of exprs; middle ones drop result, last keeps it
@@ -126,7 +126,7 @@ compile_expr(str(Chars), _, _, LN0, Code, LN) :-
 %% variable: load from memory slot
 compile_expr(var(Name), Env, Consts, LN, Code, LN) :-
     ( member(var(Name, Addr), Env) ->
-        Code = [lit(Addr), op('@')]
+        Code = [lit(Addr), op(@)]
     ; member(const(Name, V), Consts) ->
         Code = [lit(V)]
     ).
@@ -175,7 +175,7 @@ compile_expr(while(Cond, Body), Env, Consts, LN0, Code, LN) :-
 %% deref
 compile_expr(deref(E), Env, Consts, LN0, Code, LN) :-
     compile_expr(E, Env, Consts, LN0, EC, LN),
-    append(EC, [op('@')], Code).
+    append(EC, [op(@)], Code).
 
 %% deref8 — byte-level read
 compile_expr(deref8(E), Env, Consts, LN0, Code, LN) :-
@@ -188,7 +188,7 @@ compile_expr(store(Addr, Val), Env, Consts, LN0, Code, LN) :-
     compile_expr(Addr, Env, Consts, LN1, AC, LN),
     %% stack now: [... val addr], ! expects (val addr --)
     append(VC, AC, C1),
-    append(C1, [op('!')], Code).
+    append(C1, [op(!)], Code).
 
 %% store8
 compile_expr(store8(Addr, Val), Env, Consts, LN0, Code, LN) :-
@@ -230,7 +230,7 @@ compile_let([bind(Name, Expr) | Rest], Env, Consts, LN0, Code, ExtEnv, LN) :-
     %% Allocate a new slot: find max addr in Env + 2
     max_addr(Env, MaxAddr),
     Addr is MaxAddr + 2,
-    StoreCode = [lit(Addr), op('!')],
+    StoreCode = [lit(Addr), op(!)],
     NewEnv = [var(Name, Addr) | Env],
     compile_let(Rest, NewEnv, Consts, LN1, RestCode, ExtEnv, LN),
     append(ExprCode, StoreCode, BindCode),
@@ -255,22 +255,22 @@ genlabel(N, Prefix, Label, N1) :-
     atom_chars(Label, LabelChars).
 
 %% Map source ops to VM instruction sequences
-op_to_vm(+, [op('+')]).
-op_to_vm(-, [op('-')]).
-op_to_vm('and', [op('and')]).
-op_to_vm('or', [op('or')]).
-op_to_vm('xor', [op('xor')]).
-op_to_vm(=, [op('=')]).
-op_to_vm(<, [op('<')]).
+op_to_vm(+, [op(+)]).
+op_to_vm(-, [op(-)]).
+op_to_vm(and, [op(and)]).
+op_to_vm(or, [op(or)]).
+op_to_vm(xor, [op(xor)]).
+op_to_vm(=, [op(=)]).
+op_to_vm(<, [op(<)]).
 %% > : swap then <
-op_to_vm(>, [op(swap), op('<')]).
+op_to_vm(>, [op(swap), op(<)]).
 %% != : = then logical invert (0= -> swap truth)
 %% invert bool: lit 0 =  (if TOS was 0 -> -1, if TOS was -1 -> 0)
-op_to_vm('!=', [op('='), lit(0), op('=')]).
+op_to_vm('!=', [op(=), lit(0), op(=)]).
 %% <= : > then invert
-op_to_vm('<=', [op(swap), op('<'), lit(0), op('=')]).
+op_to_vm(<=, [op(swap), op(<), lit(0), op(=)]).
 %% >= : < then invert
-op_to_vm('>=', [op('<'), lit(0), op('=')]).
+op_to_vm(>=, [op(<), lit(0), op(=)]).
 
 %% Built-in trap functions (from gen/gen.pl)
 :- use_module('../gen/gen').
