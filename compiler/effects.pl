@@ -1,4 +1,4 @@
-:- module(effects, [infer_effects/2, effect_join/3, check_annotations/4]).
+:- module(effects, [infer_effects/2, effect_join/3, check_annotations/4, collect_effect_warnings/3]).
 
 :- use_module(library(lists)).
 
@@ -199,3 +199,27 @@ check_annotations([const(_, _, _)|Rest], Env, LineMap, Errors) :-
     check_annotations(Rest, Env, LineMap, Errors).
 check_annotations([extern(_, _, _)|Rest], Env, LineMap, Errors) :-
     check_annotations(Rest, Env, LineMap, Errors).
+
+%% ============================================================
+%% effect warnings (non-fatal, to stderr)
+%% ============================================================
+
+%% collect_effect_warnings(+Defs, +EffectEnv, -Warnings)
+%% Warnings for unannotated functions and over-permissive annotations.
+collect_effect_warnings([], _, []).
+collect_effect_warnings([def(Name, _, _, Decl, _)|Rest], Env, Warnings) :-
+    member(eff(Name, Inferred), Env),
+    ( Decl = none, Inferred = det ->
+        Warnings = [unannotated(Name, Inferred)|RestW]
+    ; effect_level(Decl, DL),
+      effect_level(Inferred, IL),
+      IL < DL ->
+        Warnings = [overpermissive(Name, Decl, Inferred)|RestW]
+    ;
+        Warnings = RestW
+    ),
+    collect_effect_warnings(Rest, Env, RestW).
+collect_effect_warnings([const(_, _, _)|Rest], Env, Warnings) :-
+    collect_effect_warnings(Rest, Env, Warnings).
+collect_effect_warnings([extern(_, _, _)|Rest], Env, Warnings) :-
+    collect_effect_warnings(Rest, Env, Warnings).

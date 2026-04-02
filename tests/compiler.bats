@@ -455,7 +455,7 @@ setup() {
 
 @test "deadcode: no warning when function is called" {
   warnings="$(compile_warnings '(def helper () : int 42) (def main () : void (emit (helper)) (bye))')"
-  [[ -z "$warnings" ]]
+  [[ "$warnings" != *"unused function"* ]]
 }
 
 @test "deadcode: no warning for main" {

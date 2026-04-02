@@ -49,7 +49,6 @@ compile_file(InFile, OutFile) :-
     ( Result = ok(Bytes) ->
         write_binary(OutFile, Bytes)
     ;
-        format("compile error: ~w~n", [Result]),
         halt(1)
     ).
 
@@ -81,6 +80,8 @@ compile_from_forms(Forms, Target, DefLines, Result) :-
       ;
           typecheck:check_program(Defs, TcResult),
           ( TcResult \= ok(_) ->
+              TcResult = error(TcErrors),
+              format_typecheck_errors(TcErrors, DefLines),
               Result = error(typecheck, TcResult)
           ; TcResult = ok(TypedDefs),
             ( Target = typed ->
@@ -99,6 +100,9 @@ compile_from_forms(Forms, Target, DefLines, Result) :-
                 %% Stage 3.6: dead code warnings (non-fatal, to stderr)
                 deadcode:find_dead_code(TypedDefs, DeadNames),
                 warn_dead_code(DeadNames),
+                %% Stage 3.6b: effect annotation warnings (non-fatal, to stderr)
+                effects:collect_effect_warnings(TypedDefs, EffectEnv, EffWarnings),
+                warn_effects(EffWarnings),
                 %% Stage 3.7: constant folding for det functions
                 constfold:fold_constants(TypedDefs, EffectEnv, FoldedDefs),
                 codegen:compile_program(FoldedDefs, CgResult),
@@ -225,6 +229,36 @@ ansi_yellow(Text, Colored) :-
     esc_code(E2), append(E2, "0m", Post),
     append(Pre, Text, P1), append(P1, Post, Colored).
 
+%% effect annotation warnings to stderr
+warn_effects([]).
+warn_effects([unannotated(Name, Inferred)|Rest]) :-
+    atom_chars(Name, NameChars),
+    atom_chars(Inferred, InfChars),
+    ansi_yellow("warning:", WarnTag),
+    ansi_bold(NameChars, BoldName),
+    append(WarnTag, " '", P1),
+    append(P1, BoldName, P2),
+    append(P2, "' has no effect annotation, inferred [", P3),
+    append(P3, InfChars, P4),
+    append(P4, "]\n", Msg),
+    write_stderr(Msg),
+    warn_effects(Rest).
+warn_effects([overpermissive(Name, Decl, Inferred)|Rest]) :-
+    atom_chars(Name, NameChars),
+    atom_chars(Decl, DeclChars),
+    atom_chars(Inferred, InfChars),
+    ansi_yellow("warning:", WarnTag),
+    ansi_bold(NameChars, BoldName),
+    append(WarnTag, " '", P1),
+    append(P1, BoldName, P2),
+    append(P2, "' declared [", P3),
+    append(P3, DeclChars, P4),
+    append(P4, "] but inferred [", P5),
+    append(P5, InfChars, P6),
+    append(P6, "] (annotation is too permissive)\n", Msg),
+    write_stderr(Msg),
+    warn_effects(Rest).
+
 %% dead code warnings to stderr
 warn_dead_code([]).
 warn_dead_code([Name|Rest]) :-
@@ -236,6 +270,52 @@ warn_dead_code([Name|Rest]) :-
     append(P2, "'\n", Msg),
     write_stderr(Msg),
     warn_dead_code(Rest).
+
+%% format typecheck errors to stdout
+format_typecheck_errors([], _).
+format_typecheck_errors([return_type_mismatch(Name, Expected)|Rest], DefLines) :-
+    atom_chars(Name, NameCs),
+    atom_chars(Expected, ExpCs),
+    ( member(Name-Loc, DefLines) -> true ; Loc = unknown ),
+    format_loc(Loc, LocCs),
+    ansi_bold(LocCs, BoldLoc),
+    ansi_red("error:", ErrTag),
+    ansi_bold(NameCs, BoldName),
+    append(BoldLoc, ErrTag, P1),
+    append(P1, " '", P2),
+    append(P2, BoldName, P3),
+    append(P3, "' return type mismatch, expected ", P4),
+    append(P4, ExpCs, P5),
+    append(P5, "\n", Msg),
+    write_stderr(Msg),
+    format_typecheck_errors(Rest, DefLines).
+format_typecheck_errors([type_mismatch(const, Name, Type)|Rest], DefLines) :-
+    atom_chars(Name, NameCs),
+    atom_chars(Type, TypeCs),
+    ( member(Name-Loc, DefLines) -> true ; Loc = unknown ),
+    format_loc(Loc, LocCs),
+    ansi_bold(LocCs, BoldLoc),
+    ansi_red("error:", ErrTag),
+    ansi_bold(NameCs, BoldName),
+    append(BoldLoc, ErrTag, P1),
+    append(P1, " const '", P2),
+    append(P2, BoldName, P3),
+    append(P3, "' type mismatch, declared ", P4),
+    append(P4, TypeCs, P5),
+    append(P5, "\n", Msg),
+    write_stderr(Msg),
+    format_typecheck_errors(Rest, DefLines).
+format_typecheck_errors([type_error(Expr)|Rest], DefLines) :-
+    term_to_atom(Expr, ExprAtom),
+    atom_chars(ExprAtom, ExprCs),
+    ansi_red("error:", ErrTag),
+    append(ErrTag, " type error in expression: ", P1),
+    append(P1, ExprCs, P2),
+    append(P2, "\n", Msg),
+    write_stderr(Msg),
+    format_typecheck_errors(Rest, DefLines).
+format_typecheck_errors([_|Rest], DefLines) :-
+    format_typecheck_errors(Rest, DefLines).
 
 %% format effect errors to stdout
 format_effect_errors([]).
