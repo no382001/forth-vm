@@ -54,6 +54,8 @@
 ($section 35000)
 ($alloc HEAP 0)       ; heap starts here, grows upward
 
+($include "stdlib.sets")
+
 ;; ============================================================
 ;; arithmetic helpers (no hw multiply/divide)
 ;; ============================================================
@@ -456,7 +458,7 @@
   (emit 10)
 
   
-  (while (< 0 1)
+  (while true
     (let ((len (read_line)))
       (if (= len -1) (bye)
         (if (< 0 len)

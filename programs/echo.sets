@@ -13,7 +13,7 @@
   (= (deref8 (+ a (deref STRI))) (deref8 (+ b (deref STRI)))))
 
 (def main () : void
-  (while (< 0 1)
+  (while (true)
     (store IDX 0)
     (while (do (store CHAR (key))
                (!= (deref CHAR) 10))
