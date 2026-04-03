@@ -37,7 +37,7 @@
 
 ;; ---- included stdlib (catch/throw) ----
 ;; stdlib uses $alloc for CF_SP, THROWN, CF_BASE (32 bytes)
-(include "stdlib.sets")
+($include "stdlib.sets")
 
 ;; ---- I/O buffers ----
 ($section 33000)

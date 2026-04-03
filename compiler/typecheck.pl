@@ -54,7 +54,7 @@ check_defs([Def | Rest], FuncEnv, Errors) :-
 check_def(extern(_, _, _), _, []).
 check_def(const(Name, Type, Expr), FuncEnv, Errors) :-
     ( infer([], FuncEnv, Expr, ExprType),
-      types_compatible(Type, ExprType) ->
+      ( types_compatible(Type, ExprType) ; Type = bool, numeric_type(ExprType) ) ->
         Errors = []
     ;
         Errors = [type_mismatch(const, Name, Type)]

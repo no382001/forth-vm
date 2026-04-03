@@ -1,3 +1,7 @@
+;; ---- boolean constants ----
+(const true  bool 1)
+(const false bool 0)
+
 ;; ---- VM registers (memory-mapped) ----
 (const VM_SP  int ($vm-sp))
 (const VM_RP  int ($vm-rp))

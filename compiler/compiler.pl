@@ -133,7 +133,7 @@ compile_from_forms(Forms, Target, DefLines, Result) :-
 %% ============================================================
 
 expand_includes([], _, [], []).
-expand_includes([list([sym(include), str(File)])|Rest], BaseDir, Expanded, DefLines) :-
+expand_includes([list([sym('$include'), str(File)])|Rest], BaseDir, Expanded, DefLines) :-
     !,
     atom_chars(BaseDir, BaseDirChars),
     append(BaseDirChars, File, FullPathChars),

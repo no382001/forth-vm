@@ -141,7 +141,7 @@ reserved(def). reserved(let). reserved(if). reserved(do).
 reserved(while). reserved(const). reserved(extern).
 reserved(deref). reserved(store). reserved(store8).
 reserved(addr). reserved(execute). reserved(deref8).
-reserved(include).
+reserved('$include').
 
 syms_to_names([], []).
 syms_to_names([sym(S)|Rest], [S|Names]) :-
