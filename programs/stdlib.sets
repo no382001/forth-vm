@@ -1,11 +1,4 @@
-;; ---- boolean constants ----
-(const true  bool 1)
-(const false bool 0)
-
-;; ---- VM registers (memory-mapped) ----
-(const VM_SP  int ($vm-sp))
-(const VM_RP  int ($vm-rp))
-(const VM_IP  int ($vm-ip))
+($include "core.sets")
 
 ;; ---- catch frame stack ----
 ;; Each frame: saved_RP (2 bytes) + saved_DSP (2 bytes) = 4 bytes

@@ -1,19 +1,21 @@
-(const BUF int 1028)
-(const IDX int 1026)
-(const CHAR int 1024)
+($section 1022)
+($alloc STRI  2)
+($alloc CHAR  2)
+($alloc IDX   2)
+($alloc BUF 256)
 
-(const STRI int 1022)
+($include "core.sets")
 
 (def streq ((a : int) (b : int)) : bool
   (store STRI 0)
   (while (if (= (deref8 (+ a (deref STRI))) (deref8 (+ b (deref STRI))))
            (!= (deref8 (+ a (deref STRI))) 0)
-           (< 1 0))
+           false)
     (store STRI (+ (deref STRI) 1)))
   (= (deref8 (+ a (deref STRI))) (deref8 (+ b (deref STRI)))))
 
 (def main () : void
-  (while (true)
+  (while true
     (store IDX 0)
     (while (do (store CHAR (key))
                (!= (deref CHAR) 10))

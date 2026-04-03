@@ -1,2 +1,18 @@
 - store and store8 should be c@ and c! to avoid confusion
 - with that step i should also reduce the mapping overhead, it should be 1:1
+
+errors / warnings:
+- no main
+- conflicting alloc/const/def names
+- undefined function or variable reference
+- $include file not found
+- circular includes
+- $alloc cursor reaching param region (0x4000) or stack region
+- $section pointing into code region (heap overwrites code)
+- $section going backwards over a previous $alloc (silent overwrite)
+- string literals pushing code region into the $section range
+- deref on a non-ptr type
+- if branches with mismatched types
+- while condition not bool
+- [det] function laundering effects via addr+execute of a [nondet] function
+- extern / const / $alloc declared but never used (warning)
