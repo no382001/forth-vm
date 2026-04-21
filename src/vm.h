@@ -135,6 +135,7 @@ struct vm {
   std::array<uint8_t, MEMORY_SIZE> mem{};
   bool running{true};
   bool debug{false};
+  FILE *trace_out{stderr};
   void (*trap_ext)(vm &, uint8_t) = nullptr;
 
   auto ip() -> ucell_t & { return *reinterpret_cast<ucell_t *>(&mem[IP_ADDR]); }

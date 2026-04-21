@@ -32,25 +32,36 @@ auto load_from_stdin(vm &v, uint16_t addr = 0) -> size_t {
 }
 
 auto usage(const char *prog) -> void {
-  std::cerr << "usage: " << prog << " [-t|--trace] [file]\n";
+  std::cerr << "usage: " << prog << " [-t[FILE]|--trace[=FILE]] [file]\n";
   std::cerr << "\n";
   std::cerr << "options:\n";
-  std::cerr << "  -t, --trace   trace execution\n";
-  std::cerr << "  -h, --help    show this help\n";
+  std::cerr
+      << "  -t[FILE], --trace[=FILE]   trace execution (default: stderr)\n";
+  std::cerr << "  -h, --help                 show this help\n";
 }
 
 auto main(int argc, char **argv) -> int {
 
-  static struct option long_options[] = {{"trace", no_argument, nullptr, 't'},
-                                         {"help", no_argument, nullptr, 'h'},
-                                         {nullptr, 0, nullptr, 0}};
+  static struct option long_options[] = {
+      {"trace", optional_argument, nullptr, 't'},
+      {"help", no_argument, nullptr, 'h'},
+      {nullptr, 0, nullptr, 0}};
 
   auto v = vm{};
+  FILE *trace_file_owned = nullptr;
   int opt;
-  while ((opt = getopt_long(argc, argv, "th", long_options, nullptr)) != -1) {
+  while ((opt = getopt_long(argc, argv, "t::h", long_options, nullptr)) != -1) {
     switch (opt) {
     case 't':
       v.debug = true;
+      if (optarg) {
+        trace_file_owned = std::fopen(optarg, "w");
+        if (!trace_file_owned) {
+          std::cerr << "error: cannot open trace file: " << optarg << "\n";
+          return 1;
+        }
+        v.trace_out = trace_file_owned;
+      }
       break;
     case 'h':
       usage(argv[0]);
@@ -70,4 +81,7 @@ auto main(int argc, char **argv) -> int {
   }
 
   run(v);
+
+  if (trace_file_owned)
+    std::fclose(trace_file_owned);
 }

@@ -12,5 +12,6 @@ bool display_refresh(uint8_t *fb, int w, int h);
 //           Z X C V -> A 0 B F
 bool display_key_is_down(int chip8_key);
 
-// Milliseconds since program start. Wraps at ~32s due to int16_t cell size — use deltas only.
+// Milliseconds since program start. Wraps at ~32s due to int16_t cell size —
+// use deltas only.
 int32_t display_millis();
