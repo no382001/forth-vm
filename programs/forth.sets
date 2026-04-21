@@ -3,6 +3,7 @@
 ;; Code is ~5KB; 8192 gives safe margin and is far below SlotStart (~35036).
 ($section 8192)
 ($alloc HEAP 0)
+(const HEAP_LIMIT int 32000) ; must stay below SlotStart (~35036)
 
 ;; ---- scratch cells ----
 ($section 32768)
@@ -137,7 +138,13 @@
   (store LATEST 0)
   (store HERE HEAP))
 
-(def dict_add ((name : (ptr byte)) (xt : int)) : void [semidet]
+(def dict_check () : void [nondet]
+  (if (< HEAP_LIMIT (deref HERE))
+    (do (print_str "assert: heap overflow") (emit 10) (assert-fail))
+    (store ITER 0)))
+
+(def dict_add ((name : (ptr byte)) (xt : int)) : void [nondet]
+  (dict_check)
   (let ((h (deref HERE)))
     
     (store NAMEI 0)
@@ -303,7 +310,7 @@
   (store STATE 1))  ; enter compile mode
 
 ;; ; — end a colon definition (immediate)
-(def f_semi () : void [semidet]
+(def f_semi () : void [nondet]
   (emit_cell ($op ret))    ; emit RET opcode
   (dict_add CNAME (deref CSTART))
   (store STATE 0))  ; back to interpret mode
