@@ -15,4 +15,4 @@ codegen
 Thumbs.db
 
 *.ch8
-chip8
+/chip8

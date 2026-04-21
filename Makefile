@@ -9,8 +9,8 @@ CXXFLAGS := \
 CXXFLAGS += -fsanitize=address -fno-omit-frame-pointer
 LDFLAGS += -fsanitize=address
 
-MINIFB_DIR := /home/s/git/chip8/vm/minifb
-MINIFB_LIBS := $(MINIFB_DIR)/libminifb.a -lX11 -lXrandr -lGL -lGLX
+SDL2_CFLAGS := $(shell pkg-config --cflags sdl2)
+SDL2_LIBS   := $(shell pkg-config --libs sdl2)
 
 TARGET := vm
 CHIP8  := chip8
@@ -19,7 +19,7 @@ BUILD_DIR := _build
 GEN_DIR := gen
 
 # Core VM: no display, no codegen
-SRCS := $(filter-out src/codegen.cpp src/display.cpp, $(wildcard src/*.cpp))
+SRCS := $(filter-out src/codegen.cpp, $(wildcard src/*.cpp))
 HDRS := $(wildcard src/*.h) $(wildcard src/*.hpp)
 OBJS := $(SRCS:src/%.cpp=$(BUILD_DIR)/%.o)
 
@@ -28,7 +28,8 @@ CODEGEN_OBJS := $(BUILD_DIR)/codegen.o $(BUILD_DIR)/vm.o
 # Chip8 example
 CHIP8_DIR  := examples/chip8
 CHIP8_OBJS := $(BUILD_DIR)/chip8_main.o $(BUILD_DIR)/chip8_ext.o \
-              $(BUILD_DIR)/chip8_display.o $(BUILD_DIR)/vm.o
+              $(BUILD_DIR)/chip8_display.o $(BUILD_DIR)/chip8_sound.o \
+              $(BUILD_DIR)/vm.o
 
 all: $(TARGET) $(CHIP8) $(GEN_DIR)/gen.pl
 
@@ -36,14 +37,10 @@ $(TARGET): $(OBJS)
 	$(CXX) $(LDFLAGS) $(OBJS) -o $@
 
 $(CHIP8): $(CHIP8_OBJS)
-	$(CXX) $(LDFLAGS) $(CHIP8_OBJS) $(MINIFB_LIBS) -o $@
+	$(CXX) $(LDFLAGS) $(CHIP8_OBJS) $(SDL2_LIBS) -o $@
 
 $(CODEGEN): $(CODEGEN_OBJS)
 	$(CXX) $(LDFLAGS) $(CODEGEN_OBJS) -o $@
-
-# chip8 sources need minifb headers
-$(BUILD_DIR)/chip8_display.o: CXXFLAGS += -I$(MINIFB_DIR)/include
-$(BUILD_DIR)/chip8_ext.o: CXXFLAGS += -I$(MINIFB_DIR)/include
 
 $(GEN_DIR)/gen.pl: $(CODEGEN) | $(GEN_DIR)
 	./$(CODEGEN) > $@
@@ -58,7 +55,10 @@ $(BUILD_DIR)/chip8_ext.o: $(CHIP8_DIR)/chip8_ext.cpp $(HDRS) $(CHIP8_DIR)/chip8_
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 $(BUILD_DIR)/chip8_display.o: $(CHIP8_DIR)/display.cpp $(HDRS) $(CHIP8_DIR)/display.h | $(BUILD_DIR)
-	$(CXX) $(CXXFLAGS) -I$(MINIFB_DIR)/include -c $< -o $@
+	$(CXX) $(CXXFLAGS) $(SDL2_CFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/chip8_sound.o: $(CHIP8_DIR)/sound.cpp $(CHIP8_DIR)/sound.h | $(BUILD_DIR)
+	$(CXX) $(CXXFLAGS) $(SDL2_CFLAGS) -c $< -o $@
 
 $(BUILD_DIR):
 	mkdir -p $@
