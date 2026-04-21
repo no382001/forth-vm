@@ -1,3 +1,9 @@
+;; ---- heap ----
+;; Must be below SlotStart (= FinalPtr after all $alloc).
+;; Code is ~5KB; 8192 gives safe margin and is far below SlotStart (~35036).
+($section 8192)
+($alloc HEAP 0)
+
 ;; ---- scratch cells ----
 ($section 32768)
 ($alloc STRI   2)
@@ -50,10 +56,8 @@
 ($section 34000)
 ($alloc DSB 512)      ; data stack base (256 cells)
 
-;; ---- heap ----
+;; stdlib catch frame vars: THROWN(35000), CF_SP(35002), CF_BASE(35004-35035)
 ($section 35000)
-($alloc HEAP 0)       ; heap starts here, grows upward
-
 ($include "stdlib.sets")
 
 ;; ============================================================

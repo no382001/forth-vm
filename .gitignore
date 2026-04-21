@@ -16,3 +16,5 @@ Thumbs.db
 
 *.ch8
 /chip8
+
+*.log
