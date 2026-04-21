@@ -1,0 +1,132 @@
+;; ---- scratch cells ----
+($section 32768)
+($alloc PRINTI 2)   ; print_str index
+($alloc WALKER 2)   ; dict_find: entry walker
+($alloc FOUND  2)   ; dict_find: result
+($alloc LINEI  2)   ; read_line: index
+($alloc STRI   2)   ; streq: counter
+($alloc ITER   2)   ; dict_words: entry walker
+($alloc CHAR   2)   ; current input char
+
+;; ---- dictionary state ----
+($alloc LATEST 2)
+($alloc HERE   2)
+
+;; ---- I/O ----
+($section 33000)
+($alloc BUF 256)
+
+;; ---- heap ----
+($section 35000)
+($alloc HEAP 0)
+
+;; ============================================================
+;; string utilities
+;; ============================================================
+
+;; compare two null-terminated byte strings
+(def streq ((a : (ptr byte)) (b : (ptr byte))) : bool
+  (store STRI 0)
+  (while (if (= (deref8 (+ a (deref STRI))) (deref8 (+ b (deref STRI))))
+           (!= (deref8 (+ a (deref STRI))) 0)
+           (< 1 0))
+    (store STRI (+ (deref STRI) 1)))
+  (= (deref8 (+ a (deref STRI))) (deref8 (+ b (deref STRI)))))
+
+;; print null-terminated string
+(def print_str ((s : (ptr byte))) : void
+  (store PRINTI 0)
+  (while (!= (deref8 (+ s (deref PRINTI))) 0)
+    (emit (deref8 (+ s (deref PRINTI))))
+    (store PRINTI (+ (deref PRINTI) 1))))
+
+;; ============================================================
+;; dictionary
+;; ============================================================
+
+(def dict_init () : void
+  (store LATEST 0)
+  (store HERE HEAP))
+
+;; add entry: link=LATEST, name ptr, xt; update LATEST and HERE
+(def dict_add ((name : (ptr byte)) (xt : int)) : void
+  (let ((h (deref HERE)))
+    (store h (deref LATEST))
+    (store (+ h 2) name)
+    (store (+ h 4) xt)
+    (store LATEST h)
+    (store HERE (+ h 6))))
+
+;; find word in dictionary, return xt or 0
+(def dict_find ((name : (ptr byte))) : int
+  (store WALKER (deref LATEST))
+  (store FOUND 0)
+  (while (if (!= (deref WALKER) 0) (= (deref FOUND) 0) (< 1 0))
+    (if (streq name (deref (+ (deref WALKER) 2)))
+      (store FOUND (deref (+ (deref WALKER) 4)))
+      (store WALKER (deref (deref WALKER)))))
+  (deref FOUND))
+
+;; print all words in dictionary
+(def dict_words () : void
+  (store ITER (deref LATEST))
+  (while (!= (deref ITER) 0)
+    (print_str (deref (+ (deref ITER) 2)))
+    (emit 32)
+    (store ITER (deref (deref ITER))))
+  (emit 10))
+
+;; ============================================================
+;; input
+;; ============================================================
+
+;; read a line into BUF, null-terminate, return length (-1 on EOF)
+(def read_line () : int
+  (store LINEI 0)
+  (while (do (store CHAR (key))
+             (if (= (deref CHAR) -1) (< 1 0)
+               (!= (deref CHAR) 10)))
+    (store8 (+ BUF (deref LINEI)) (deref CHAR))
+    (store LINEI (+ (deref LINEI) 1)))
+  (store8 (+ BUF (deref LINEI)) 0)
+  (if (if (= (deref CHAR) -1) (= (deref LINEI) 0) (< 1 0))
+    -1
+    (deref LINEI)))
+
+;; ============================================================
+;; dispatch — execute a word by its xt
+;; ============================================================
+
+;; xt assignments:
+;;   1 = bye      — exit
+;;   2 = hello    — print greeting
+;;   3 = words    — list dictionary
+
+(def dispatch ((xt : int)) : void
+  (if (= xt 1) (bye)
+    (if (= xt 2) (do (print_str "Hello!") (emit 10))
+      (if (= xt 3) (dict_words)
+        (store PRINTI 0)))))
+
+;; ============================================================
+;; main
+;; ============================================================
+
+(def main () : void
+  (dict_init)
+
+  ;; populate dictionary
+  (dict_add "bye" 1)
+  (dict_add "hello" 2)
+  (dict_add "words" 3)
+
+  ;; REPL loop
+  (while (< 0 1)
+    (let ((len (read_line)))
+      (if (= len -1) (bye)
+        (if (!= (deref8 BUF) 0)
+          (let ((xt (dict_find BUF)))
+            (if (= xt 0)
+              (do (print_str BUF) (print_str " ?") (emit 10))
+              (dispatch xt)))
+          (store PRINTI 0))))))

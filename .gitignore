@@ -13,3 +13,6 @@ codegen
 
 .DS_Store
 Thumbs.db
+
+*.ch8
+chip8

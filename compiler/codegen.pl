@@ -1,17 +1,23 @@
-:- module(codegen, [compile_program/2]).
+:- module(codegen, [compile_program/3]).
 
 :- use_module(library(lists)).
 
 :- dynamic(user_void_func/1).
+:- dynamic(ext_trap/3). % ext_trap(Name, Code, Ret)
 
 %% ============================================================
 %% entry
 %% ============================================================
 
-compile_program(Defs, ok(Code)) :-
+compile_program(Defs, SlotBase, ok(Code)) :-
     collect_consts(Defs, Consts),
     register_void_funcs(Defs),
-    compile_defs(Defs, Consts, 0, 16384, Code).
+    register_ext_traps(Defs),
+    %% Align SlotBase to next even boundary (slots are 2 bytes)
+    SlotBase0 is SlotBase + (SlotBase mod 2),
+    %% Ensure slots start above 16384 minimum even without $alloc globals
+    SlotStart is max(SlotBase0, 16384),
+    compile_defs(Defs, Consts, 0, SlotStart, Code).
 
 register_void_funcs(Defs) :-
     retractall(user_void_func(_)),
@@ -25,6 +31,17 @@ register_void_funcs_([Def | Rest]) :-
         true
     ),
     register_void_funcs_(Rest).
+
+register_ext_traps(Defs) :-
+    retractall(ext_trap(_, _, _)),
+    register_ext_traps_(Defs).
+
+register_ext_traps_([]).
+register_ext_traps_([extern(Name, Code, _, Ret) | Rest]) :-
+    assertz(ext_trap(Name, Code, Ret)),
+    register_ext_traps_(Rest).
+register_ext_traps_([_ | Rest]) :-
+    register_ext_traps_(Rest).
 
 %% ============================================================
 %% collect top-level constants for inlining
@@ -47,6 +64,7 @@ compile_defs([Def | Rest], Consts, LN0, Slot0, Code) :-
     append(DefCode, RestCode, Code).
 
 compile_def(extern(_, _, _), _, LN, Slot, [], LN, Slot).
+compile_def(extern(_, _, _, _), _, LN, Slot, [], LN, Slot).
 compile_def(const(_, _, _), _, LN, Slot, [], LN, Slot).
 
 compile_def(def(Name, Params, _RetType, _, Body), Consts, LN0, Slot0, Code, LN, SlotAfter) :-
@@ -265,6 +283,9 @@ genlabel(N, Prefix, Label, N1) :-
 %% Map source ops to VM instruction sequences
 op_to_vm(+, [op(+)]).
 op_to_vm(-, [op(-)]).
+op_to_vm(*, [op(*)]).
+op_to_vm(/, [op('/')]).
+op_to_vm(mod, [op(mod)]).
 op_to_vm(and, [op(and)]).
 op_to_vm(or, [op(or)]).
 op_to_vm(xor, [op(xor)]).
@@ -285,6 +306,8 @@ op_to_vm(>=, [op(<), lit(0), op(=)]).
 
 builtin_trap(Name, Ret, [lit(Code), op(trap)]) :-
     gen:trap_type(Name, Code, _, Ret).
+builtin_trap(Name, Ret, [lit(Code), op(trap)]) :-
+    ext_trap(Name, Code, Ret).
 
 %% ============================================================
 %% tests

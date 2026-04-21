@@ -300,7 +300,7 @@
 
 ;; ; — end a colon definition (immediate)
 (def f_semi () : void [semidet]
-  (emit_cell 23)    ; emit RET opcode
+  (emit_cell ($op ret))    ; emit RET opcode
   (dict_add CNAME (deref CSTART))
   (store STATE 0))  ; back to interpret mode
 
@@ -399,10 +399,10 @@
       (f_semi)
       (let ((xt (dict_find WBUF)))
         (if (!= xt 0)
-          (do (emit_cell 22) (emit_cell xt))
+          (do (emit_cell ($op call)) (emit_cell xt))
           (if (parse_num)
-            (do (emit_cell 1) (emit_cell (deref PN_ACC))
-                (emit_cell 22) (emit_cell (addr ds_push)))
+            (do (emit_cell ($op lit)) (emit_cell (deref PN_ACC))
+                (emit_cell ($op call)) (emit_cell (addr ds_push)))
             (do (print_str WBUF) (print_str " ?") (emit 10))))))))
 
 ;; run all tokens on a line, wrapped in catch

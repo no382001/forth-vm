@@ -3,6 +3,7 @@
 
 :- use_module(parser).
 :- use_module(ast).
+:- use_module('../gen/gen').
 :- use_module(typecheck).
 :- use_module(codegen).
 :- use_module(emit).
@@ -29,12 +30,12 @@ compile_source(Source, Target, Result) :-
         Result = error(parse, ParseResult)
     ; ParseResult = ok(Forms),
       %% Stage 1.5: meta-expansion ($section, $alloc, $vm-sp, etc.)
-      expand_metas(Forms, Expanded),
+      expand_metas(Forms, Expanded, FinalPtr),
       compute_def_lines(Source, DefLines),
       ( Target = parsed ->
           Result = ok(Expanded)
       ;
-          compile_from_forms(Expanded, Target, DefLines, Result)
+          compile_from_forms(Expanded, Target, DefLines, FinalPtr, Result)
       )
     ).
 
@@ -54,6 +55,11 @@ compile_file(InFile, OutFile) :-
 
 %% compile with include expansion
 compile_source_with_includes(Source, BaseDir, Target, Result) :-
+    paren_balance(Source, BalCheck),
+    ( BalCheck \= ok ->
+        format_paren_error(BalCheck),
+        Result = error(parse, BalCheck)
+    ;
     parser:parse(Source, ParseResult),
     ( ParseResult \= ok(_) ->
         Result = error(parse, ParseResult)
@@ -61,16 +67,17 @@ compile_source_with_includes(Source, BaseDir, Target, Result) :-
       compute_def_lines(Source, MainDefLines),
       expand_includes(Forms, BaseDir, IncExpanded, IncDefLines),
       append(MainDefLines, IncDefLines, DefLines),
-      expand_metas(IncExpanded, Expanded),
+      expand_metas(IncExpanded, Expanded, FinalPtr),
       ( Target = parsed ->
           Result = ok(Expanded)
       ;
-          compile_from_forms(Expanded, Target, DefLines, Result)
+          compile_from_forms(Expanded, Target, DefLines, FinalPtr, Result)
       )
+    )
     ).
 
 %% compile pipeline from already-parsed (and include-expanded) forms
-compile_from_forms(Forms, Target, DefLines, Result) :-
+compile_from_forms(Forms, Target, DefLines, SlotBase, Result) :-
     ast:transform_program(Forms, AstResult),
     ( AstResult \= ok(_) ->
         Result = error(ast, AstResult)
@@ -105,7 +112,7 @@ compile_from_forms(Forms, Target, DefLines, Result) :-
                 warn_effects(EffWarnings),
                 %% Stage 3.7: constant folding for det functions
                 constfold:fold_constants(TypedDefs, EffectEnv, FoldedDefs),
-                codegen:compile_program(FoldedDefs, CgResult),
+                codegen:compile_program(FoldedDefs, SlotBase, CgResult),
                 ( CgResult \= ok(_) ->
                     Result = error(codegen, CgResult)
                 ; CgResult = ok(Tokens),
@@ -171,34 +178,38 @@ meta_const('$vm-sp', A)  :- DS is 65535 - (256 * 2 * 2), A is DS - 6.
 meta_const('$vm-rp', A)  :- DS is 65535 - (256 * 2 * 2), A is DS - 4.
 meta_const('$vm-ip', A)  :- DS is 65535 - (256 * 2 * 2), A is DS - 2.
 
-%% expand_metas(+Forms, -Expanded)
-%% Process top-level forms, expanding $-prefixed meta directives
-expand_metas(Forms, Expanded) :-
-    expand_metas_(Forms, 0, Expanded).
+%% expand_metas(+Forms, -Expanded, -FinalPtr)
+%% Process top-level forms, expanding $-prefixed meta directives.
+%% FinalPtr is the allocation pointer after the last $alloc — use as slot base.
+expand_metas(Forms, Expanded, FinalPtr) :-
+    expand_metas_(Forms, 0, Expanded, FinalPtr).
 
-%% expand_metas_(+Forms, +AllocPtr, -Expanded)
-expand_metas_([], _, []).
+%% expand_metas_(+Forms, +AllocPtr, -Expanded, -FinalPtr)
+expand_metas_([], Ptr, [], Ptr).
 
 %% ($section addr) — set allocation pointer
-expand_metas_([list([sym('$section'), num(Addr)])|Rest], _, Expanded) :-
+expand_metas_([list([sym('$section'), num(Addr)])|Rest], _, Expanded, FinalPtr) :-
     !,
-    expand_metas_(Rest, Addr, Expanded).
+    expand_metas_(Rest, Addr, Expanded, FinalPtr).
 
 %% ($alloc name size) — allocate and emit const
-expand_metas_([list([sym('$alloc'), sym(Name), num(Size)])|Rest], Ptr, [Const|Expanded]) :-
+expand_metas_([list([sym('$alloc'), sym(Name), num(Size)])|Rest], Ptr, [Const|Expanded], FinalPtr) :-
     !,
     Const = list([sym(const), sym(Name), sym(int), num(Ptr)]),
     NextPtr is Ptr + Size,
-    expand_metas_(Rest, NextPtr, Expanded).
+    expand_metas_(Rest, NextPtr, Expanded, FinalPtr).
 
 %% any other form — recursively expand meta-expressions inside it
-expand_metas_([Form|Rest], Ptr, [Expanded|ExpandedRest]) :-
+expand_metas_([Form|Rest], Ptr, [Expanded|ExpandedRest], FinalPtr) :-
     expand_meta_expr(Form, Expanded),
-    expand_metas_(Rest, Ptr, ExpandedRest).
+    expand_metas_(Rest, Ptr, ExpandedRest, FinalPtr).
 
 %% expand_meta_expr: replace ($vm-sp) etc. with num(N) inside any form
 expand_meta_expr(list([sym(Name)]), num(Val)) :-
     meta_const(Name, Val), !.
+%% ($op name) -> opcode number
+expand_meta_expr(list([sym('$op'), sym(OpName)]), num(Code)) :-
+    gen:op(OpName, Code, _, _, _, _), !.
 expand_meta_expr(list(Elems), list(ExpandedElems)) :-
     !, maplist(expand_meta_expr, Elems, ExpandedElems).
 expand_meta_expr(X, X).
@@ -354,6 +365,66 @@ format_loc(loc(File, L, C), Cs) :-
     append(P3, CCs, P4),
     append(P4, ": ", Cs).
 format_loc(unknown, "").
+
+%% ============================================================
+%% paren balance checker — runs before the parser to give a
+%% useful error location instead of a raw character dump
+%% ============================================================
+
+%% paren_balance(+Chars, -Result)
+%% Result = ok | error(extra_close, loc(L,C)) | error(unclosed, loc(L,C))
+paren_balance(Chars, Result) :-
+    paren_scan(Chars, 1, 1, 0, [], Result).
+
+paren_scan([], _, _, 0, _, ok) :- !.
+paren_scan([], _, _, _, [loc(L,C)|_], error(unclosed, loc(L,C))) :- !.
+paren_scan(['\n'|Rest], L, _, D, Stk, R) :- !,
+    L1 is L+1, paren_scan(Rest, L1, 1, D, Stk, R).
+paren_scan([';'|Rest], L, _, D, Stk, R) :- !,
+    skip_to_nl(Rest, L, Rest1, L1),
+    paren_scan(Rest1, L1, 1, D, Stk, R).
+paren_scan(['"'|Rest], L, C, D, Stk, R) :- !,
+    C1 is C+1, skip_str(Rest, L, C1, Rest1, L1, C2),
+    paren_scan(Rest1, L1, C2, D, Stk, R).
+paren_scan(['('|Rest], L, C, D, Stk, R) :- !,
+    D1 is D+1, C1 is C+1,
+    paren_scan(Rest, L, C1, D1, [loc(L,C)|Stk], R).
+paren_scan([')'|Rest], L, C, D, Stk, R) :- !,
+    ( D =:= 0 ->
+        R = error(extra_close, loc(L,C))
+    ;
+        D1 is D-1, C1 is C+1,
+        Stk = [_|Stk1],
+        paren_scan(Rest, L, C1, D1, Stk1, R)
+    ).
+paren_scan([_|Rest], L, C, D, Stk, R) :- !,
+    C1 is C+1, paren_scan(Rest, L, C1, D, Stk, R).
+
+skip_to_nl([], L, [], L1) :- L1 is L+1.
+skip_to_nl(['\n'|Rest], L, Rest, L1) :- !, L1 is L+1.
+skip_to_nl([_|Rest], L, Rest1, L1) :- skip_to_nl(Rest, L, Rest1, L1).
+
+skip_str([], L, C, [], L, C).
+skip_str(['"'|Rest], L, C, Rest, L, C1) :- !, C1 is C+1.
+skip_str(['\n'|Rest], L, _, Rest1, L1, C1) :- !,
+    L_ is L+1, skip_str(Rest, L_, 1, Rest1, L1, C1).
+skip_str([_|Rest], L, C, Rest1, L1, C1) :-
+    C_ is C+1, skip_str(Rest, L, C_, Rest1, L1, C1).
+
+format_paren_error(error(unclosed, loc(L, C))) :-
+    format_loc(loc(L, C), LocCs),
+    ansi_bold(LocCs, BoldLoc),
+    ansi_red("error:", ErrTag),
+    append(BoldLoc, ErrTag, P1),
+    append(P1, " unclosed '('\n", Msg),
+    write_stderr(Msg).
+format_paren_error(error(extra_close, loc(L, C))) :-
+    format_loc(loc(L, C), LocCs),
+    ansi_bold(LocCs, BoldLoc),
+    ansi_red("error:", ErrTag),
+    append(BoldLoc, ErrTag, P1),
+    append(P1, " unexpected ')'\n", Msg),
+    write_stderr(Msg).
 
 write_stderr(Msg) :-
     current_output(StdOut),

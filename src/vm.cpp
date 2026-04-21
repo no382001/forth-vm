@@ -80,6 +80,21 @@ inline auto h_sub(vm &v) -> void {
   top(v) -= b;
 }
 
+inline auto h_mul(vm &v) -> void {
+  auto b = pop(v);
+  top(v) = static_cast<cell_t>(top(v) * b);
+}
+
+inline auto h_div(vm &v) -> void {
+  auto b = pop(v);
+  top(v) = static_cast<cell_t>(top(v) / b);
+}
+
+inline auto h_mod(vm &v) -> void {
+  auto b = pop(v);
+  top(v) = static_cast<cell_t>(top(v) % b);
+}
+
 inline auto h_and(vm &v) -> void {
   auto b = pop(v);
   top(v) &= b;
@@ -129,7 +144,7 @@ inline auto h_execute(vm &v) -> void {
 }
 
 inline auto h_trap(vm &v) -> void {
-  auto n = pop(v);
+  auto n = static_cast<uint8_t>(pop(v));
   switch (n) {
   case TRAP_EMIT:
     std::putchar(static_cast<char>(pop(v)));
@@ -144,7 +159,10 @@ inline auto h_trap(vm &v) -> void {
     exit(1);
     break;
   default:
-    assert(false && "unknown trap");
+    if (v.trap_ext)
+      v.trap_ext(v, n);
+    else
+      assert(false && "unknown trap");
     break;
   }
 }
@@ -165,6 +183,9 @@ const std::array<op_info, OP_COUNT> dispatch = {{
     {RFETCH, "r@", 0, 1, 1, 1, h_rfetch},
     {ADD, "+", 2, 1, 0, 0, h_add},
     {SUB, "-", 2, 1, 0, 0, h_sub},
+    {MUL, "*", 2, 1, 0, 0, h_mul},
+    {DIV, "/", 2, 1, 0, 0, h_div},
+    {MOD, "mod", 2, 1, 0, 0, h_mod},
     {AND, "and", 2, 1, 0, 0, h_and},
     {OR, "or", 2, 1, 0, 0, h_or},
     {XOR, "xor", 2, 1, 0, 0, h_xor},

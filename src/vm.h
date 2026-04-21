@@ -97,6 +97,9 @@ enum op : uint8_t {
   // alu
   ADD,
   SUB,
+  MUL,
+  DIV,
+  MOD,
   AND,
   OR,
   XOR,
@@ -132,6 +135,7 @@ struct vm {
   std::array<uint8_t, MEMORY_SIZE> mem{};
   bool running{true};
   bool debug{false};
+  void (*trap_ext)(vm &, uint8_t) = nullptr;
 
   auto ip() -> ucell_t & { return *reinterpret_cast<ucell_t *>(&mem[IP_ADDR]); }
   auto sp() -> ucell_t & { return *reinterpret_cast<ucell_t *>(&mem[SP_ADDR]); }

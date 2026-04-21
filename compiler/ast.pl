@@ -29,6 +29,12 @@ transform(list([sym(extern), sym(Name), list(RawParamTypes), sym(:), RetTy]),
     maplist(transform_type, RawParamTypes, ParamTypes),
     transform_type(RetTy, RetType).
 
+%% (extern name code (param-types...) : ret-type)  — extension trap with explicit code
+transform(list([sym(extern), sym(Name), num(Code), list(RawParamTypes), sym(:), RetTy]),
+          extern(Name, Code, ParamTypes, RetType)) :-
+    maplist(transform_type, RawParamTypes, ParamTypes),
+    transform_type(RetTy, RetType).
+
 %% (const name type value)
 transform(list([sym(const), sym(Name), TypeSym, ValForm]),
           const(Name, Type, Val)) :-
@@ -132,7 +138,7 @@ transform_type(sym(void), void).
 transform_type(list([sym(ptr), Inner]), ptr(T)) :-
     transform_type(Inner, T).
 
-binop(+). binop(-). binop(*).
+binop(+). binop(-). binop(*). binop(/). binop(mod).
 binop(and). binop(or). binop(xor).
 binop(=). binop(<). binop(>).
 binop('!='). binop(<=). binop(>=).

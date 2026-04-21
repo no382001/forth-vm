@@ -24,6 +24,7 @@ build_det_fns([_|Rest], Env, Fns) :-
 
 fold_def(_, const(N, T, V), const(N, T, V)).
 fold_def(_, extern(N, P, R), extern(N, P, R)).
+fold_def(_, extern(N, C, P, R), extern(N, C, P, R)).
 fold_def(DetFns, def(Name, Params, RetType, Decl, Body), def(Name, Params, RetType, Decl, FoldedBody)) :-
     maplist(fold_expr(DetFns), Body, FoldedBody).
 

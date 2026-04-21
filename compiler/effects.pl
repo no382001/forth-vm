@@ -41,6 +41,8 @@ init_effects([const(_, _, _)|Rest], Effs) :-
     init_effects(Rest, Effs).
 init_effects([extern(_, _, _)|Rest], Effs) :-
     init_effects(Rest, Effs).
+init_effects([extern(_, _, _, _)|Rest], Effs) :-
+    init_effects(Rest, Effs).
 
 fixpoint(Defs, Env, Result) :-
     infer_all(Defs, Env, NewEnv),
@@ -58,6 +60,8 @@ infer_all([def(Name, _, _, _, Body)|Rest], Env, Result) :-
 infer_all([const(_, _, _)|Rest], Env, Result) :-
     infer_all(Rest, Env, Result).
 infer_all([extern(_, _, _)|Rest], Env, Result) :-
+    infer_all(Rest, Env, Result).
+infer_all([extern(_, _, _, _)|Rest], Env, Result) :-
     infer_all(Rest, Env, Result).
 
 update_effect(Name, Eff, [], [eff(Name, Eff)]).
@@ -199,6 +203,8 @@ check_annotations([const(_, _, _)|Rest], Env, LineMap, Errors) :-
     check_annotations(Rest, Env, LineMap, Errors).
 check_annotations([extern(_, _, _)|Rest], Env, LineMap, Errors) :-
     check_annotations(Rest, Env, LineMap, Errors).
+check_annotations([extern(_, _, _, _)|Rest], Env, LineMap, Errors) :-
+    check_annotations(Rest, Env, LineMap, Errors).
 
 %% ============================================================
 %% effect warnings (non-fatal, to stderr)
@@ -222,4 +228,6 @@ collect_effect_warnings([def(Name, _, _, Decl, _)|Rest], Env, Warnings) :-
 collect_effect_warnings([const(_, _, _)|Rest], Env, Warnings) :-
     collect_effect_warnings(Rest, Env, Warnings).
 collect_effect_warnings([extern(_, _, _)|Rest], Env, Warnings) :-
+    collect_effect_warnings(Rest, Env, Warnings).
+collect_effect_warnings([extern(_, _, _, _)|Rest], Env, Warnings) :-
     collect_effect_warnings(Rest, Env, Warnings).

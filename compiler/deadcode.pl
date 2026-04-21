@@ -26,6 +26,8 @@ collect_defined([const(_, _, _)|Rest], Names) :-
     collect_defined(Rest, Names).
 collect_defined([extern(_, _, _)|Rest], Names) :-
     collect_defined(Rest, Names).
+collect_defined([extern(_, _, _, _)|Rest], Names) :-
+    collect_defined(Rest, Names).
 
 %% ============================================================
 %% collect all referenced names (calls + addr)
@@ -38,6 +40,7 @@ collect_referenced(Defs, Refs) :-
 def_body_refs(def(_, _, _, _, Body), Refs) :- body_refs(Body, Refs).
 def_body_refs(const(_, _, _), []).
 def_body_refs(extern(_, _, _), []).
+def_body_refs(extern(_, _, _, _), []).
 
 body_refs(Exprs, Refs) :-
     maplist(expr_refs, Exprs, AllRefs),

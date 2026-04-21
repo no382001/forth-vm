@@ -9,30 +9,56 @@ CXXFLAGS := \
 CXXFLAGS += -fsanitize=address -fno-omit-frame-pointer
 LDFLAGS += -fsanitize=address
 
+MINIFB_DIR := /home/s/git/chip8/vm/minifb
+MINIFB_LIBS := $(MINIFB_DIR)/libminifb.a -lX11 -lXrandr -lGL -lGLX
+
 TARGET := vm
+CHIP8  := chip8
 CODEGEN := codegen
 BUILD_DIR := _build
 GEN_DIR := gen
 
-SRCS := $(filter-out src/codegen.cpp, $(wildcard src/*.cpp))
+# Core VM: no display, no codegen
+SRCS := $(filter-out src/codegen.cpp src/display.cpp, $(wildcard src/*.cpp))
 HDRS := $(wildcard src/*.h) $(wildcard src/*.hpp)
 OBJS := $(SRCS:src/%.cpp=$(BUILD_DIR)/%.o)
 
 CODEGEN_OBJS := $(BUILD_DIR)/codegen.o $(BUILD_DIR)/vm.o
 
-all: $(TARGET) $(GEN_DIR)/gen.pl
+# Chip8 example
+CHIP8_DIR  := examples/chip8
+CHIP8_OBJS := $(BUILD_DIR)/chip8_main.o $(BUILD_DIR)/chip8_ext.o \
+              $(BUILD_DIR)/chip8_display.o $(BUILD_DIR)/vm.o
+
+all: $(TARGET) $(CHIP8) $(GEN_DIR)/gen.pl
 
 $(TARGET): $(OBJS)
 	$(CXX) $(LDFLAGS) $(OBJS) -o $@
 
+$(CHIP8): $(CHIP8_OBJS)
+	$(CXX) $(LDFLAGS) $(CHIP8_OBJS) $(MINIFB_LIBS) -o $@
+
 $(CODEGEN): $(CODEGEN_OBJS)
 	$(CXX) $(LDFLAGS) $(CODEGEN_OBJS) -o $@
+
+# chip8 sources need minifb headers
+$(BUILD_DIR)/chip8_display.o: CXXFLAGS += -I$(MINIFB_DIR)/include
+$(BUILD_DIR)/chip8_ext.o: CXXFLAGS += -I$(MINIFB_DIR)/include
 
 $(GEN_DIR)/gen.pl: $(CODEGEN) | $(GEN_DIR)
 	./$(CODEGEN) > $@
 
 $(BUILD_DIR)/%.o: src/%.cpp $(HDRS) | $(BUILD_DIR)
 	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/chip8_main.o: $(CHIP8_DIR)/main.cpp $(HDRS) $(CHIP8_DIR)/chip8_ext.h | $(BUILD_DIR)
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/chip8_ext.o: $(CHIP8_DIR)/chip8_ext.cpp $(HDRS) $(CHIP8_DIR)/chip8_ext.h | $(BUILD_DIR)
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/chip8_display.o: $(CHIP8_DIR)/display.cpp $(HDRS) $(CHIP8_DIR)/display.h | $(BUILD_DIR)
+	$(CXX) $(CXXFLAGS) -I$(MINIFB_DIR)/include -c $< -o $@
 
 $(BUILD_DIR):
 	mkdir -p $@
@@ -42,15 +68,17 @@ $(GEN_DIR):
 
 .PHONY: clean
 clean:
-	rm -rf $(BUILD_DIR) $(GEN_DIR) $(TARGET) $(CODEGEN)
+	rm -rf $(BUILD_DIR) $(GEN_DIR) $(TARGET) $(CHIP8) $(CODEGEN)
 
 .PHONY: format
 format:
-	clang-format -i $(wildcard src/*.cpp) $(HDRS)
+	clang-format -i $(wildcard src/*.cpp) $(wildcard src/*.h) \
+	             $(wildcard $(CHIP8_DIR)/*.cpp) $(wildcard $(CHIP8_DIR)/*.h)
 
 .PHONY: format-check
 format-check:
-	clang-format --dry-run --Werror $(wildcard src/*.cpp) $(HDRS)
+	clang-format --dry-run --Werror $(wildcard src/*.cpp) $(wildcard src/*.h) \
+	             $(wildcard $(CHIP8_DIR)/*.cpp) $(wildcard $(CHIP8_DIR)/*.h)
 
 .PHONY: test
 test: quad bats
@@ -68,3 +96,6 @@ bats: $(TARGET) $(GEN_DIR)/gen.pl
 # Compile .sets programs to .bin
 programs/%.bin: programs/%.sets $(GEN_DIR)/gen.pl
 	@cd compiler && scryer-prolog -f -g "use_module(compiler), compile_file('../$<', '../$@'), halt." < /dev/null
+
+examples/chip8/chip8.bin: examples/chip8/chip8.sets $(GEN_DIR)/gen.pl
+	@cd compiler && scryer-prolog -f compiler.pl -g "compile_file('../examples/chip8/chip8.sets', '../examples/chip8/chip8.bin'), halt." < /dev/null

@@ -34,6 +34,8 @@ build_func_env([def(Name, Params, RetType, _, _Body) | Rest], Acc, Env) :-
     build_func_env(Rest, [func(Name, PTypes, RetType) | Acc], Env).
 build_func_env([extern(Name, PTypes, RetType) | Rest], Acc, Env) :-
     build_func_env(Rest, [func(Name, PTypes, RetType) | Acc], Env).
+build_func_env([extern(Name, _, PTypes, RetType) | Rest], Acc, Env) :-
+    build_func_env(Rest, [func(Name, PTypes, RetType) | Acc], Env).
 build_func_env([const(Name, Type, _) | Rest], Acc, Env) :-
     build_func_env(Rest, [const(Name, Type) | Acc], Env).
 
@@ -52,6 +54,7 @@ check_defs([Def | Rest], FuncEnv, Errors) :-
     append(DefErrors, RestErrors, Errors).
 
 check_def(extern(_, _, _), _, []).
+check_def(extern(_, _, _, _), _, []).
 check_def(const(Name, Type, Expr), FuncEnv, Errors) :-
     ( infer([], FuncEnv, Expr, ExprType),
       ( types_compatible(Type, ExprType) ; Type = bool, numeric_type(ExprType) ) ->
@@ -117,7 +120,7 @@ infer(_, FEnv, var(Name), Type) :-
 
 %% binary arithmetic -> int
 infer(Env, FEnv, binop(Op, A, B), int) :-
-    member(Op, [+, -, *, and, or, xor]),
+    member(Op, [+, -, *, /, mod, and, or, xor]),
     infer(Env, FEnv, A, AT),
     infer(Env, FEnv, B, BT),
     numeric_type(AT),
