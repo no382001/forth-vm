@@ -2,10 +2,11 @@
 
 > **draft** — work in progress, details may change
 
-16-bit stack VM with a statically-typed s-expression compiler called **sets** *((**s**)-(**e**)xpression (**t**)yped (**s**)ystems language)*. VM in C++20, compiler in Scryer Prolog.
+A minimal Forth-style stack VM and a statically-typed s-expression compiler called **sets** *((**s**)-(**e**)xpression (**t**)yped (**s**)ystems language)*. VM in C++20, compiler in Scryer Prolog.
 
 ## contents
 
+- [ramble](#ramble)
 - [build](#build)
 - [usage](#usage)
 - [test](#test)
@@ -21,6 +22,16 @@
 - [VM](#vm)
   - [memory model](#memory-model)
   - [instruction set](#instruction-set)
+
+## ramble
+
+Some time ago I found a word-sized celled Forth VM on the [Silicon Valley Forth Interest Group's site](https://www.forth.org/) and was baffled by the binary-only F# compiler that came with it. It didn't work for me, the whole thing was an old tar snapshot with memory dumps, I spent an embarrassing amount of time trying to make it work, but it just ended up easier to take the model and rewrite it. There were some sidetracks along the way — I spent some time thinking about memory footprint because (I thought) a lot of space was wasted in the bytecode, everything word-sized even where it didn't need to be. At that point I was thinking of compile mode as a special thing, effective and space-efficient, where interpreted and compiled would have been two different ways of looking at the same memory — but interpreted mode would have needed to live entirely in memory, I got really confused about what that even meant in practice and started from scratch. I wrote two Forth interpreters after that: the first time realizing mid-way that I needed a return stack, and the second time — with a return stack — being unsatisfied with the fact that I could just make it a VM and drop the interpreter part completely. It can be this clean, I thought. I guess this is the curse of implementing Forth systems (but at least the cost of re-inventing is minimal timewise, compared to anything else). The goal was now to make the dictionary in pure threaded code, and finding the smallest subset of operations that enables bigger abstractions to be built on top of them. Make everything threaded! 
+
+This is where Prolog comes in, just like in one of my previous/ongoing projects — a [PDP-11/40 emulator](https://github.com/no382001/pdp-11-40-emulator) — where the pattern was the same: the emulator loops reading bytes from a stdin pipe, and a Prolog pipeline takes a list of atoms representing primitive instructions, encodes them, and pushes them down the pipe. Lists in Prolog make this kind of thing really easy to work with, and later when the compiler grows, pattern matching and DCGs make parsing and AST transformations trivial. Coming from the BCPL-like language I had there, I tried a C-like macro pasting approach to paper over the non-existence of named words at the bytecode level — which made everything even more confusing, and on top of that the Polish notation was catching up to me. When you take some weeks off and come back it can be baffling. I'm more of an s-expressions guy anyway, so I wrote a frontend for that instead.
+
+Around the same time I remembered something I tried with my Scheme interpreter — I wanted to write an MCE (metacircular evaluator) that enabled some sort of typed Scheme, never got to it, got stuck on some combination of macros and semiquoting (made me drop the project). This felt like the right moment to try again. Type inference works as stack effect inference basically — Sets functions can only leave one value on the stack (or void), not two or more, just to keep things simple. While the compiler is catching type errors it can also infer `det`/`semidet`/`nondet` the same way and do const folding on top.
+
+Sets does betray the Forth philosophy to some degree, though the type system and effect inference help keep kernel development in check. The Forth written in Sets and targeting the Forth VM is free to be as Forth as it wants, as long as it keeps to the memory boundaries the REPL sets behind it.
 
 ## build
 
@@ -43,8 +54,6 @@ make test
 ```
 
 Requires: [bats](https://github.com/bats-core/bats-core)
-
-> the inline `?-` tests in the compiler `.pl` files won't run unless you use the [quads branch of Scryer](https://github.com/no382001/scryer-prolog/tree/quads)
 
 ## language
 
@@ -91,7 +100,7 @@ expr       = number | string | symbol
            | '{' symbol* '}' ;
 
 binding    = '(' symbol expr ')' ;
-binop      = '+' | '-' | '=' | '<' | '>' | '!=' | '<=' | '>=' | 'and' | 'or' | 'xor' ;
+binop      = '+' | '-' | '*' | '/' | 'mod' | '=' | '<' | '>' | '!=' | '<=' | '>=' | 'and' | 'or' | 'xor' ;
 ```
 
 Comments start with `;` and run to end of line.
@@ -216,8 +225,8 @@ Memory layout of the above program at runtime (default config):
 
  addr  64505   64511          65023          65535
        ┌───────┬──────────────┬──────────────┐
-       │ regs  │   rstack     │   dstack     │
-       │SP RP  │   512 B      │   512 B      │
+       │ regs  │   dstack     │   rstack     │
+       │SP RP IP│  512 B      │   512 B      │
        └───────┴──────────────┴──────────────┘
 ```
 
@@ -247,7 +256,7 @@ Flat byte-addressable memory. Programs are loaded at address 0 and grow upward. 
 ```
 0                                                           MEMORY_SIZE
 ┌─────────────────────────────────┬───────┬──────────┬──────────┐
-│ program + heap (grows ->)       │ regs  │  rstack  │  dstack  │
+│ program + heap (grows ->)       │ regs  │  dstack  │  rstack  │
 └─────────────────────────────────┴───────┴──────────┴──────────┘
                                   DS_START-n DS_START  RS_START
 ```
@@ -276,6 +285,6 @@ Minimal threaded-style bytecode:
 | memory | `@` `!` `c@` `c!` |
 | stack | `dup` `drop` `swap` `over` |
 | return stack | `>r` `r>` `r@` |
-| alu | `+` `-` `and` `or` `xor` `=` `<` |
+| alu | `+` `-` `*` `/` `mod` `and` `or` `xor` `=` `<` |
 | control | `branch` `0branch` `call` `ret` `execute` |
 | system | `trap` |
