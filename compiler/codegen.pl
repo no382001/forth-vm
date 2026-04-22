@@ -275,9 +275,7 @@ chars_to_bytes([C|Cs], [byte(B)|Bs]) :-
 genlabel(N, Prefix, Label, N1) :-
     N1 is N + 1,
     number_chars(N, NChars),
-    atom_chars(PrefixAtom, Prefix),
-    atom_chars(PrefixAtom, PrefixChars),
-    append(PrefixChars, NChars, LabelChars),
+    append(Prefix, NChars, LabelChars),
     atom_chars(Label, LabelChars).
 
 %% Map source ops to VM instruction sequences
