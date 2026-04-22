@@ -15,12 +15,6 @@
 ($alloc ITER   2)
 ($alloc CHAR   2)
 
-;; ---- mul/divmod scratch ----
-($alloc REM    2)
-($alloc DENOM  2)
-($alloc SIGN   2)
-($alloc QUOT   2)
-
 ;; ---- print_num scratch ----
 ($alloc PN_VAL 2)
 ($alloc PN_IDX 2)
@@ -60,35 +54,6 @@
 ;; stdlib catch frame vars: THROWN(35000), CF_SP(35002), CF_BASE(35004-35035)
 ($section 35000)
 ($include "stdlib.sets")
-
-;; ============================================================
-;; arithmetic helpers (no hw multiply/divide)
-;; ============================================================
-
-;; multiply via repeated addition
-;; uses: REM, DENOM, SIGN, QUOT
-(def mul ((a : int) (b : int)) : int [semidet]
-  (store SIGN 1)
-  (if (< a 0) (do (store SIGN (- 0 (deref SIGN))) (store REM (- 0 a))) (store REM a))
-  (if (< b 0) (do (store SIGN (- 0 (deref SIGN))) (store DENOM (- 0 b))) (store DENOM b))
-  (store QUOT 0)
-  (while (< 0 (deref DENOM))
-    (store QUOT (+ (deref QUOT) (deref REM)))
-    (store DENOM (- (deref DENOM) 1)))
-  (if (< (deref SIGN) 0) (- 0 (deref QUOT)) (deref QUOT)))
-
-;; integer division via repeated subtraction
-;; returns quotient; remainder available as (deref REM) after call
-;; uses: REM (remainder), DENOM, SIGN, QUOT (quotient)
-(def divmod ((a : int) (b : int)) : int [semidet]
-  (store SIGN 1)
-  (if (< a 0) (do (store SIGN (- 0 (deref SIGN))) (store REM (- 0 a))) (store REM a))
-  (if (< b 0) (do (store SIGN (- 0 (deref SIGN))) (store DENOM (- 0 b))) (store DENOM b))
-  (store QUOT 0)
-  (while (if (< (deref REM) (deref DENOM)) (< 1 0) (< 0 1))
-    (store REM (- (deref REM) (deref DENOM)))
-    (store QUOT (+ (deref QUOT) 1)))
-  (if (< (deref SIGN) 0) (- 0 (deref QUOT)) (deref QUOT)))
 
 ;; ============================================================
 ;; string utilities
@@ -577,7 +542,7 @@
   
   (while true
     (let ((len (read_line)))
-      (if (= len -1) (bye)
+      (if (= len -1) (do (print_str "got eof, exiting...") (emit 10) (bye))
         (if (< 0 len)
           (do
             (store THROWN 0)

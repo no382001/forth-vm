@@ -2,7 +2,7 @@
 
 > **draft** — work in progress, details may change
 
-*slab* is flat-memory stack Forth VM that comes with a statically-typed s-expression compiler called **sets** *((**s**)-(**e**)xpression (**t**)yped (**s**)ystems language)*. VM in C++20, compiler in Scryer Prolog.
+*slab* is a flat-memory 16-bit stack VM. It comes with **sets** *((**s**)-(**e**)xpression (**t**)yped (**s**)ystems language)* — a statically-typed s-expression language that compiles to slab bytecode. The instruction set is small and word-addressed, easy to target from a simple compiler and easy to extend. sets itself is written in Scryer Prolog; the VM in C++20.
 
 ## contents
 
@@ -122,15 +122,23 @@ Comments start with `;` and run to end of line.
 
 ### effect annotations
 
-Functions can optionally declare their computational effect:
+Every function sits at one level of a three-level hierarchy:
 
-| annotation | meaning |
-|------------|---------|
-| `[det]` | pure, no side effects and thus eligible for constant folding |
-| `[semidet]` | reads or writes memory |
-| `[nondet]` | performs I/O or otherwise escapes |
+```
+det  <  semidet  <  nondet
+```
 
-The compiler infers effects and errors if a declaration is stricter than inferred. Unannotated `det` functions produce a warning.
+The names come from Prolog's solution determinism, but the meaning here is about predictability of effect:
+
+**`[det]`** — pure. The result depends only on the arguments. No memory access, no side effects. Given the same inputs you always get the same output, so the compiler can fold calls at compile time.
+
+**`[semidet]`** — reads or writes memory, but no I/O. Memory is *semi*-deterministic in the sense that it behaves predictably given a known state — a read always returns what was last written there, a write always takes effect. There is no blocking, no external influence. The function is deterministic conditioned on the flat address space; you just can't reduce it away at compile time because the memory state isn't known statically.
+
+Write-only, non-blocking I/O sits in a structural gray area: `emit` always takes effect, never blocks, and returns nothing unpredictable — the same properties that define a memory write. The difference is that its effect escapes the address space, so it cannot be analyzed locally. It still belongs in `[nondet]`.
+
+**`[nondet]`** — performs I/O or otherwise escapes. Non-determinism has two faces: the *value* returned (a `key` call gives back whatever the user types, a file read depends on disk state) and the *duration* before control returns (a read may block indefinitely). Either dimension alone is enough to force `[nondet]`. Write-only I/O like `emit` has no unpredictable return value and does not block, but it still escapes — its effects are invisible to local analysis and cannot be reordered or eliminated. Anything that touches the outside world belongs here.
+
+The hierarchy is a claim about the worst thing a function does. It propagates upward: calling a `[semidet]` function makes the caller at least `[semidet]`; calling a `[nondet]` function forces `[nondet]` all the way up. The compiler infers the actual effect and errors if the declared annotation is stricter than the body warrants. Omitting the annotation on a `det`-eligible function produces a warning.
 
 ### built-in primitives
 

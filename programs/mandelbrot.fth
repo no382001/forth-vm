@@ -26,4 +26,4 @@ variable I    variable TMP
     CSTEP + repeat drop cr
   RSTEP + repeat drop ;
 
-mandel bye
+mandel
