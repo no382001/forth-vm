@@ -376,7 +376,7 @@ paren_balance(Chars, Result) :-
     paren_scan(Chars, 1, 1, 0, [], Result).
 
 paren_scan([], _, _, 0, _, ok) :- !.
-paren_scan([], _, _, _, [loc(L,C)|_], error(unclosed, loc(L,C))) :- !.
+paren_scan([], _, _, _, [open(Ch,L,C)|_], error(unclosed(Ch), loc(L,C))) :- !.
 paren_scan(['\n'|Rest], L, _, D, Stk, R) :- !,
     L1 is L+1, paren_scan(Rest, L1, 1, D, Stk, R).
 paren_scan([';'|Rest], L, _, D, Stk, R) :- !,
@@ -387,8 +387,30 @@ paren_scan(['"'|Rest], L, C, D, Stk, R) :- !,
     paren_scan(Rest1, L1, C2, D, Stk, R).
 paren_scan(['('|Rest], L, C, D, Stk, R) :- !,
     D1 is D+1, C1 is C+1,
-    paren_scan(Rest, L, C1, D1, [loc(L,C)|Stk], R).
+    paren_scan(Rest, L, C1, D1, [open('(',L,C)|Stk], R).
 paren_scan([')'|Rest], L, C, D, Stk, R) :- !,
+    ( D =:= 0 ->
+        R = error(extra_close, loc(L,C))
+    ;
+        D1 is D-1, C1 is C+1,
+        Stk = [_|Stk1],
+        paren_scan(Rest, L, C1, D1, Stk1, R)
+    ).
+paren_scan(['['|Rest], L, C, D, Stk, R) :- !,
+    D1 is D+1, C1 is C+1,
+    paren_scan(Rest, L, C1, D1, [open('[',L,C)|Stk], R).
+paren_scan([']'|Rest], L, C, D, Stk, R) :- !,
+    ( D =:= 0 ->
+        R = error(extra_close, loc(L,C))
+    ;
+        D1 is D-1, C1 is C+1,
+        Stk = [_|Stk1],
+        paren_scan(Rest, L, C1, D1, Stk1, R)
+    ).
+paren_scan(['{'|Rest], L, C, D, Stk, R) :- !,
+    D1 is D+1, C1 is C+1,
+    paren_scan(Rest, L, C1, D1, [open('{',L,C)|Stk], R).
+paren_scan(['}'|Rest], L, C, D, Stk, R) :- !,
     ( D =:= 0 ->
         R = error(extra_close, loc(L,C))
     ;
@@ -410,12 +432,13 @@ skip_str(['\n'|Rest], L, _, Rest1, L1, C1) :- !,
 skip_str([_|Rest], L, C, Rest1, L1, C1) :-
     C_ is C+1, skip_str(Rest, L, C_, Rest1, L1, C1).
 
-format_paren_error(error(unclosed, loc(L, C))) :-
+format_paren_error(error(unclosed(Ch), loc(L, C))) :-
     format_loc(loc(L, C), LocCs),
     ansi_bold(LocCs, BoldLoc),
     ansi_red("error:", ErrTag),
     append(BoldLoc, ErrTag, P1),
-    append(P1, " unclosed '('\n", Msg),
+    append(P1, " unclosed '", P2),
+    append(P2, [Ch, '\'', '\n'], Msg),
     write_stderr(Msg).
 format_paren_error(error(extra_close, loc(L, C))) :-
     format_loc(loc(L, C), LocCs),
