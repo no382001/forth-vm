@@ -1,8 +1,8 @@
-# forth-vm
+# slab
 
 > **draft** — work in progress, details may change
 
-A minimal Forth-style stack VM and a statically-typed s-expression compiler called **sets** *((**s**)-(**e**)xpression (**t**)yped (**s**)ystems language)*. VM in C++20, compiler in Scryer Prolog.
+*slab* is flat-memory stack Forth VM that comes with a statically-typed s-expression compiler called **sets** *((**s**)-(**e**)xpression (**t**)yped (**s**)ystems language)*. VM in C++20, compiler in Scryer Prolog.
 
 ## contents
 
@@ -286,5 +286,5 @@ Minimal threaded-style bytecode:
 | stack | `dup` `drop` `swap` `over` |
 | return stack | `>r` `r>` `r@` |
 | alu | `+` `-` `*` `/` `mod` `and` `or` `xor` `=` `<` |
-| control | `branch` `0branch` `call` `ret` `execute` |
+| control | `branch` `zbranch` `call` `ret` `execute` |
 | system | `trap` |

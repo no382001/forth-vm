@@ -21,9 +21,6 @@ optimizations:
 - sub-expression constfold: fold det calls with constant args anywhere they appear, not just inside det functions — the containing function's effect is irrelevant
 - auto-decomposition: identify det sub-regions inside nondet/semidet functions, extract them into separate det functions with their free variables as explicit parameters; or at minimum warn that a large det sub-expression exists and could be extracted
 
-
-
-mandelbrot demo in forth
 the point of the type system is to compile time check before running the kernel, since the mce is threaded im using the same thread as the kernel is doing, so i cant leave anything on there
 
-it should have a name + refine the readme and add 2 gifs of running
+refine the readme and add 2 gifs of running
