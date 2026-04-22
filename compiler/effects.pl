@@ -129,11 +129,12 @@ infer_expr_effect(let(Bindings, Body), Env, Eff) :-
 infer_expr_effect(do(Exprs), Env, Eff) :-
     infer_body_effect(Exprs, Env, Eff).
 
-%% while -> cond + body (also semidet at minimum since it's stateful looping)
+%% while -> cond + body (semidet at minimum: stateful looping)
 infer_expr_effect(while(Cond, Body), Env, Eff) :-
     infer_expr_effect(Cond, Env, EC),
     infer_body_effect(Body, Env, EB),
-    effect_join(EC, EB, Eff).
+    effect_join(EC, EB, ChildEff),
+    effect_join(semidet, ChildEff, Eff).
 
 %% function call -> callee's effect + args effects
 infer_expr_effect(call(Name, Args), Env, Eff) :-
