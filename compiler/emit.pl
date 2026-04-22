@@ -84,7 +84,7 @@ encode_token(branch(Label), Labels, Bytes) :-
 
 %% zbranch label
 encode_token(zbranch(Label), Labels, Bytes) :-
-    opcode('0branch', Op),
+    opcode('zbranch', Op),
     member(Label-Addr, Labels),
     gen:cell_size(CS),
     encode_cell(CS, Op, OpBytes),

@@ -36,7 +36,8 @@ auto usage(const char *prog) -> void {
   std::cerr << "\n";
   std::cerr << "options:\n";
   std::cerr << "  -t, --trace          trace execution to stderr\n";
-  std::cerr << "  -o FILE, --output FILE   write trace to FILE instead of stderr\n";
+  std::cerr
+      << "  -o FILE, --output FILE   write trace to FILE instead of stderr\n";
   std::cerr << "  -h, --help           show this help\n";
 }
 

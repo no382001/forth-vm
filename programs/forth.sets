@@ -121,9 +121,8 @@
       ;; extract digits, remainder in REM
       (store PN_IDX 0)
       (while (< 0 (deref PN_VAL))
-        (store PN_VAL (divmod (deref PN_VAL) 10))
-        
-        (store8 (+ PN_BUF (deref PN_IDX)) (+ 48 (deref REM)))
+        (store8 (+ PN_BUF (deref PN_IDX)) (+ 48 (mod (deref PN_VAL) 10)))
+        (store PN_VAL (/ (deref PN_VAL) 10))
         (store PN_IDX (+ (deref PN_IDX) 1)))
       ;; emit reversed
       (while (< 0 (deref PN_IDX))
@@ -193,7 +192,7 @@
   (deref (deref DSP)))
 
 (def ds_depth () : int [semidet]
-  (divmod (- (deref DSP) DSB) 2))
+  (/ (- (deref DSP) DSB) 2))
 
 ;; print stack contents: <n> elem1 elem2 ... top
 (def ds_show () : void [nondet]
@@ -277,11 +276,11 @@
         (let ((c (deref8 (+ WBUF (deref PN_POS)))))
           (if (if (< 47 c) (< c 58) (< 1 0))
             (do
-              (store PN_ACC (+ (mul (deref PN_ACC) 10) (- c 48)))
+              (store PN_ACC (+ (* (deref PN_ACC) 10) (- c 48)))
               (store PN_POS (+ (deref PN_POS) 1)))
             (store PN_OK 0))))
       (if (= (deref PN_OK) 1)
-        (do (store PN_ACC (mul (deref PN_ACC) (deref PN_SIGN)))
+        (do (store PN_ACC (* (deref PN_ACC) (deref PN_SIGN)))
             (< 0 1))
         (< 1 0)))))
 
@@ -325,15 +324,13 @@
   (let ((b (ds_pop))) (ds_push (- (ds_pop) b))))
 
 (def f_mul () : void [semidet]
-  (let ((b (ds_pop))) (ds_push (mul (ds_pop) b))))
+  (let ((b (ds_pop))) (ds_push (* (ds_pop) b))))
 
 (def f_div () : void [semidet]
-  (let ((b (ds_pop))) (ds_push (divmod (ds_pop) b))))
+  (let ((b (ds_pop))) (ds_push (/ (ds_pop) b))))
 
 (def f_mod () : void [semidet]
-  (let ((b (ds_pop)))
-    (let ((a (ds_pop)))
-      (divmod a b) (ds_push (deref REM)))))
+  (let ((b (ds_pop))) (ds_push (mod (ds_pop) b))))
 
 (def f_dup () : void [semidet]
   (let ((a (ds_pop))) (ds_push a) (ds_push a)))
@@ -392,6 +389,101 @@
 (def f_bye () : void [nondet]
   (bye))
 
+(def f_fetch () : void [semidet]
+  (ds_push (deref (ds_pop))))
+
+(def f_store () : void [semidet]
+  (let ((addr (ds_pop)))
+    (let ((val (ds_pop)))
+      (store addr val))))
+
+(def f_2dup () : void [semidet]
+  (let ((b (ds_pop)))
+    (let ((a (ds_pop)))
+      (ds_push a) (ds_push b) (ds_push a) (ds_push b))))
+
+(def f_2drop () : void [semidet]
+  (ds_pop) (ds_pop) (store ITER 0))
+
+(def f_variable () : void [nondet]
+  (tok_next)
+  (save_name)
+  (let ((data_addr (deref HERE)))
+    (store HERE (+ (deref HERE) 2))
+    (store data_addr 0)
+    (let ((stub (deref HERE)))
+      (emit_cell ($op lit))
+      (emit_cell data_addr)
+      (emit_cell ($op call))
+      (emit_cell (addr ds_push))
+      (emit_cell ($op ret))
+      (dict_add CNAME stub))))
+
+(def f_constant () : void [nondet]
+  (tok_next)
+  (save_name)
+  (let ((val (ds_pop)))
+    (let ((stub (deref HERE)))
+      (emit_cell ($op lit))
+      (emit_cell val)
+      (emit_cell ($op call))
+      (emit_cell (addr ds_push))
+      (emit_cell ($op ret))
+      (dict_add CNAME stub))))
+
+;; immediate compile-mode words — called directly, not via dictionary
+;; conditional branches need to bridge from Forth data stack to native VM stack:
+;; emit CALL ds_pop (pushes Forth TOS to native stack), then ZBRANCH
+
+(def f_if () : void [semidet]
+  (emit_cell ($op call))
+  (emit_cell (addr ds_pop))
+  (emit_cell ($op zbranch))
+  (emit_cell 0)
+  (ds_push (- (deref HERE) 2)))
+
+(def f_then () : void [semidet]
+  (store (ds_pop) (deref HERE)))
+
+(def f_else () : void [semidet]
+  (emit_cell ($op branch))
+  (emit_cell 0)
+  (let ((new_patch (- (deref HERE) 2)))
+    (let ((old_patch (ds_pop)))
+      (store old_patch (deref HERE))
+      (ds_push new_patch))))
+
+(def f_begin () : void [semidet]
+  (ds_push (deref HERE)))
+
+(def f_until () : void [semidet]
+  (emit_cell ($op call))
+  (emit_cell (addr ds_pop))
+  (emit_cell ($op zbranch))
+  (emit_cell (ds_pop)))
+
+(def f_while () : void [semidet]
+  (emit_cell ($op call))
+  (emit_cell (addr ds_pop))
+  (emit_cell ($op zbranch))
+  (emit_cell 0)
+  (ds_push (- (deref HERE) 2)))
+
+(def f_repeat () : void [semidet]
+  (let ((patch (ds_pop)))
+    (let ((begin_addr (ds_pop)))
+      (emit_cell ($op branch))
+      (emit_cell begin_addr)
+      (store patch (deref HERE)))))
+
+(def f_again () : void [semidet]
+  (emit_cell ($op branch))
+  (emit_cell (ds_pop)))
+
+(def f_recurse () : void [semidet]
+  (emit_cell ($op call))
+  (emit_cell (deref CSTART)))
+
 ;; ============================================================
 ;; interpret one word (in WBUF)
 ;; ============================================================
@@ -406,15 +498,23 @@
           (ds_push (deref PN_ACC))
           (do (print_str WBUF) (print_str " ?") (emit 10)))))
     ;; --- compile mode ---
-    (if (streq WBUF ";")
-      (f_semi)
+    (if (streq WBUF ";")       (f_semi)
+    (if (streq WBUF "if")      (f_if)
+    (if (streq WBUF "then")    (f_then)
+    (if (streq WBUF "else")    (f_else)
+    (if (streq WBUF "begin")   (f_begin)
+    (if (streq WBUF "until")   (f_until)
+    (if (streq WBUF "while")   (f_while)
+    (if (streq WBUF "repeat")  (f_repeat)
+    (if (streq WBUF "again")   (f_again)
+    (if (streq WBUF "recurse") (f_recurse)
       (let ((xt (dict_find WBUF)))
         (if (!= xt 0)
           (do (emit_cell ($op call)) (emit_cell xt))
           (if (parse_num)
             (do (emit_cell ($op lit)) (emit_cell (deref PN_ACC))
                 (emit_cell ($op call)) (emit_cell (addr ds_push)))
-            (do (print_str WBUF) (print_str " ?") (emit 10))))))))
+            (do (print_str WBUF) (print_str " ?") (emit 10)))))))))))))))))
 
 ;; run all tokens on a line, wrapped in catch
 ;; catch_push saves RP here; if throw fires, we return from run_line early
@@ -461,6 +561,12 @@
   (dict_add "xor"    (addr f_xor))
   (dict_add "mod"    (addr f_mod))
   (dict_add "throw"  (addr f_throw))
+  (dict_add "@"      (addr f_fetch))
+  (dict_add "!"      (addr f_store))
+  (dict_add "2dup"   (addr f_2dup))
+  (dict_add "2drop"  (addr f_2drop))
+  (dict_add "variable" (addr f_variable))
+  (dict_add "constant" (addr f_constant))
 
   (dict_add ":"      (addr f_colon))
 

@@ -192,7 +192,7 @@ const std::array<op_info, OP_COUNT> dispatch = {{
     {EQ, "=", 2, 1, 0, 0, h_eq},
     {LT, "<", 2, 1, 0, 0, h_lt},
     {BRANCH, "branch", 0, 0, 0, 0, h_branch},
-    {ZBRANCH, "0branch", 1, 0, 0, 0, h_zbranch},
+    {ZBRANCH, "zbranch", 1, 0, 0, 0, h_zbranch},
     {CALL, "call", 0, 0, 0, 1, h_call},
     {RET, "ret", 0, 0, 1, 0, h_ret},
     {EXECUTE, "execute", 1, 0, 0, 1, h_execute},
