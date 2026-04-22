@@ -426,12 +426,7 @@ format_paren_error(error(extra_close, loc(L, C))) :-
     write_stderr(Msg).
 
 write_stderr(Msg) :-
-    current_output(StdOut),
-    open('/dev/stderr', write, Err),
-    set_output(Err),
-    maplist(put_char, Msg),
-    close(Err),
-    set_output(StdOut).
+    maplist(put_char(user_error), Msg).
 
 read_source(File, Chars) :-
     open(File, read, S),
