@@ -2,7 +2,7 @@
 
 > **draft** — work in progress, details may change
 
-*slab* is a flat-memory 16-bit stack VM. It comes with **sets** *((**s**)-(**e**)xpression (**t**)yped (**s**)ystems language)* — a statically-typed s-expression language that compiles to slab bytecode. The instruction set is small and word-addressed, easy to target from a simple compiler and easy to extend. sets itself is written in Scryer Prolog; the VM in C++20.
+*slab* is a flat-memory stack VM. It comes with **sets** *((**s**)-(**e**)xpression (**t**)yped (**s**)ystems language)* — a statically-typed s-expression language that compiles to slab bytecode. The instruction set is small and word-addressed, easy to target from a simple compiler and easy to extend. sets itself is written in Scryer Prolog; the VM in C++20.
 
 `forth.sets` is a Forth interpreter written in sets, compiled to slab bytecode. `./mandelbrot` compiles it, loads `programs/mandelbrot.fth`, and runs.
 
