@@ -169,6 +169,9 @@ eval_args(DetFns, Env, [A|As], Steps, [num(V)|Vs], StepsOut) :-
 
 eval_binop(+, A, B, R) :- R is (A + B) mod 65536.
 eval_binop(-, A, B, R) :- R is (A - B) mod 65536.
+eval_binop(*, A, B, R) :- R is (A * B) mod 65536.
+eval_binop(/, A, B, R) :- B =\= 0, R is A // B.
+eval_binop(mod, A, B, R) :- B =\= 0, R is A mod B.
 eval_binop(<, A, B, R) :- ( A < B -> R = 1 ; R = 0 ).
 eval_binop(>, A, B, R) :- ( A > B -> R = 1 ; R = 0 ).
 eval_binop(=, A, B, R) :- ( A =:= B -> R = 1 ; R = 0 ).
